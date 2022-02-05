@@ -145,6 +145,7 @@ class SpecSeg( object ):
         self.checkpoint_save_dir = args.checkpoint_save_dir
         self.result_dir          = args.result_dir
         self.log_dir             = args.log_dir
+        self.val_dir             = args.val_dir
         # self.lambda_recons       = args.lambda_recons
         # self.lambda_class        = args.lambda_class
 
@@ -594,6 +595,7 @@ class SpecSeg( object ):
 
                 input_image = element[0]
                 input_mask  = element[1]
+                val_image  = element[2]
 
 
                 self.train_step( input_image, input_mask )
@@ -696,25 +698,29 @@ class SpecSeg( object ):
     @tf.function(experimental_follow_type_hints=True, jit_compile=True)
     def datasetLoad( self ):
         rootfolder = self.data_dir
+        valfolder  = self.val_dir
         # FOR SHMGAN Dataset
         path1 = os.path.join( rootfolder, 'HighlightImages' )
         path2 = os.path.join( rootfolder, 'HighlightMasks' )
+        valpath   = os.path.join( valfolder, 'HighlightImages' )
 
         data_dir1 = pathlib.Path( path1 )
         data_dir2 = pathlib.Path( path2 )
+        data_dir3 = pathlib.Path( valpath )
 
         # NOTE:  => The generated datasets do not have any lables
 
         rgb_images = tf.keras.preprocessing.image_dataset_from_directory(
                 str( data_dir1 ),
-                  labels           = None,
-                # label_mode       = 'categorical',
-                  color_mode       = 'rgb',
-                  validation_split = None,
-                  shuffle          = False,
-                  seed             = 1337,
-                  image_size       = (self.image_size, self.image_size),
-                  batch_size       = 1
+                    labels           = None,
+                  # label_mode       = 'categorical',
+                    color_mode       = 'rgb',
+                    validation_split = 0.2,
+                    subset           = "training",
+                    shuffle          = False,
+                    seed             = 1337,
+                    image_size       = (self.image_size, self.image_size),
+                    batch_size       = 1
                 ) \
                 .cache() \
                 .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
@@ -727,14 +733,15 @@ class SpecSeg( object ):
 
         masks = tf.keras.preprocessing.image_dataset_from_directory(
                 str( data_dir2 ),
-                  labels           = None,
-                # label_mode       = 'categorical',
-                  color_mode       = 'rgb',
-                  validation_split = None,
-                  shuffle          = False,
-                  seed             = 1337,
-                  image_size       = (self.image_size, self.image_size),
-                  batch_size       = 1
+                    labels           = None,
+                  # label_mode       = 'categorical',
+                    color_mode       = 'rgb',
+                    validation_split = 0.2,
+                    subset           = "training",
+                    shuffle          = False,
+                    seed             = 1337,
+                    image_size       = (self.image_size, self.image_size),
+                    batch_size       = 1
                 ) \
                 .cache() \
                 .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
@@ -744,8 +751,29 @@ class SpecSeg( object ):
                 # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
         masks.class_names = 'MASK'
 
+        val_images = tf.keras.preprocessing.image_dataset_from_directory(
+                str( data_dir1 ),
+                    labels           = None,
+                  # label_mode       = 'categorical',
+                    color_mode       = 'rgb',
+                    validation_split = 0.2,
+                    subset           = "validation",
+                    shuffle          = False,
+                    seed             = 1337,
+                    image_size       = (self.image_size, self.image_size),
+                    batch_size       = 1
+                ) \
+                .cache() \
+                .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+                .prefetch(25)
+                # .map(lambda x: tf.image.per_image_standardization( x ) ) \
+                # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+                # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
+        # Manually update the labels (?)
+        val_images.class_names = 'RGB Validation'
+
         # ZIP the datasets into one dataset
-        loadedDataset = tf.data.Dataset.zip ( ( rgb_images, masks ) )
+        loadedDataset = tf.data.Dataset.zip ( ( rgb_images, masks, val_images ) )
         # dataset.map(time_consuming_mapping).cache().map(memory_consuming_mapping)
 
         # Sauce: https://www.tensorflow.org/guide/data_performance_analysis#3_are_you_reaching_high_cpu_utilization
@@ -818,254 +846,254 @@ class SpecSeg( object ):
 
         # Step1: Load the test images
         rootfolder = args.test_dir
-        testpath = pathlib.Path( rootfolder )
-        # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
-        # the dataset loading images
-        test_images = tf.keras.preprocessing.image_dataset_from_directory(
-                str( testpath ),
-                  labels           = None,
-                # label_mode       = 'categorical',
-                  color_mode       = 'rgb',
-                  validation_split = None,
-                  shuffle          = False,
-                  seed             = 1337,
-                  image_size       = (self.image_size, self.image_size),
-                  batch_size       = 1
-                ) \
-                .cache() \
-                .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
-                .map(lambda x: tf.image.per_image_standardization( x ) ) \
-                .prefetch(25)
-                # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
-                # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
-        test_images.class_names = 'TEST'
+        # testpath = pathlib.Path( rootfolder )
+        # # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
+        # # the dataset loading images
+        # test_images = tf.keras.preprocessing.image_dataset_from_directory(
+        #         str( testpath ),
+        #           labels           = None,
+        #         # label_mode       = 'categorical',
+        #           color_mode       = 'rgb',
+        #           validation_split = None,
+        #           shuffle          = False,
+        #           seed             = 1337,
+        #           image_size       = (self.image_size, self.image_size),
+        #           batch_size       = 1
+        #         ) \
+        #         .cache() \
+        #         .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
+        #         .map(lambda x: tf.image.per_image_standardization( x ) ) \
+        #         .prefetch(25)
+        #         # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+        #         # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
+        # test_images.class_names = 'TEST'
 
-        # Only load diffuse images if the flag is True
-        if args.calc_metrics == True:
-            diffusefolder = args.diffuse_dir
-            diffusepath = pathlib.Path( diffusefolder )
-            # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
-            # the dataset loading images
-            diffuse_images = tf.keras.preprocessing.image_dataset_from_directory(
-                    str( diffusepath ),
-                    labels           = None,
-                    # label_mode       = 'categorical',
-                    color_mode       = 'rgb',
-                    validation_split = None,
-                    shuffle          = False,
-                    seed             = 1337,
-                    image_size       = (self.image_size, self.image_size),
-                    batch_size       = 1
-                    ) \
-                    .cache() \
-                    .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
-                    .map(lambda x: tf.image.per_image_standardization( x ) ) \
-                    .prefetch(25)
-                    # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
-                    # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
-            test_images.class_names = 'TEST'
+        # # Only load diffuse images if the flag is True
+        # if args.calc_metrics == True:
+        #     diffusefolder = args.diffuse_dir
+        #     diffusepath = pathlib.Path( diffusefolder )
+        #     # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
+        #     # the dataset loading images
+        #     diffuse_images = tf.keras.preprocessing.image_dataset_from_directory(
+        #             str( diffusepath ),
+        #             labels           = None,
+        #             # label_mode       = 'categorical',
+        #             color_mode       = 'rgb',
+        #             validation_split = None,
+        #             shuffle          = False,
+        #             seed             = 1337,
+        #             image_size       = (self.image_size, self.image_size),
+        #             batch_size       = 1
+        #             ) \
+        #             .cache() \
+        #             .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
+        #             .map(lambda x: tf.image.per_image_standardization( x ) ) \
+        #             .prefetch(25)
+        #             # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+        #             # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
+        #     test_images.class_names = 'TEST'
 
-        # return the number of files loaded
-        self.number_of_test_images = len(np.concatenate([i for i in test_images], axis=0))
+        # # return the number of files loaded
+        # self.number_of_test_images = len(np.concatenate([i for i in test_images], axis=0))
 
-        # ZIP the datasets into one dataset
-        if args.calc_metrics == True:
-            loadedDataset = tf.data.Dataset.zip ( ( test_images, diffuse_images ) )
-        else:
-            loadedDataset = tf.data.Dataset.zip ( test_images )
+        # # ZIP the datasets into one dataset
+        # if args.calc_metrics == True:
+        #     loadedDataset = tf.data.Dataset.zip ( ( test_images, diffuse_images ) )
+        # else:
+        #     loadedDataset = tf.data.Dataset.zip ( test_images )
 
-        options = tf.data.Options()
-        options.experimental_threading.max_intra_op_parallelism = 1
-        loadedDataset = loadedDataset.with_options(options)
-        loadedDataset = loadedDataset.cache().prefetch( buffer_size =25)
+        # options = tf.data.Options()
+        # options.experimental_threading.max_intra_op_parallelism = 1
+        # loadedDataset = loadedDataset.with_options(options)
+        # loadedDataset = loadedDataset.cache().prefetch( buffer_size =25)
 
-        # Load the G and D
-        self.G = self.build_unet( )
-        # self.D = self.build_discriminator( )
-        # Print Model summary to console and file
-        self.G.summary()
-        self.D.summary()
-        with open('Generator_summary.txt', 'w') as f:
-            self.G.summary(print_fn=lambda x: f.write(x + '\n'))
-        with open('Discriminator_summary.txt', 'w') as f:
-            self.D.summary(print_fn=lambda x: f.write(x + '\n'))
+        # # Load the G and D
+        # self.G = self.build_unet( )
+        # # self.D = self.build_discriminator( )
+        # # Print Model summary to console and file
+        # self.G.summary()
+        # self.D.summary()
+        # with open('Generator_summary.txt', 'w') as f:
+        #     self.G.summary(print_fn=lambda x: f.write(x + '\n'))
+        # with open('Discriminator_summary.txt', 'w') as f:
+        #     self.D.summary(print_fn=lambda x: f.write(x + '\n'))
 
 
-        # STEP2: Load checkpoints
-        checkpoint_dir    = self.checkpoint_save_dir
-        ckpt = tf.train.Checkpoint( generator     = self.G,
-                                    discriminator = self.D,
-                                    optimizer_D   = self.optimizer_D,
-                                    optimizer_G   = self.optimizer_G )
-        ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_dir, max_to_keep=3)
-        ckpt.restore(ckpt_manager.latest_checkpoint).expect_partial()
-        print ('Latest checkpoint restored!!')
+        # # STEP2: Load checkpoints
+        # checkpoint_dir    = self.checkpoint_save_dir
+        # ckpt = tf.train.Checkpoint( generator     = self.G,
+        #                             discriminator = self.D,
+        #                             optimizer_D   = self.optimizer_D,
+        #                             optimizer_G   = self.optimizer_G )
+        # ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_dir, max_to_keep=3)
+        # ckpt.restore(ckpt_manager.latest_checkpoint).expect_partial()
+        # print ('Latest checkpoint restored!!')
 
-        plt.close("all")
-        gc.collect()
+        # plt.close("all")
+        # gc.collect()
 
-        # STEP3: Iterate over the loaded test images
-        test_iterator = iter(loadedDataset)
+        # # STEP3: Iterate over the loaded test images
+        # test_iterator = iter(loadedDataset)
 
-        # create zeros and ones for labels
-        tmp_zeros = tf.zeros( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
-        trg_ones  = tf.ones( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
+        # # create zeros and ones for labels
+        # tmp_zeros = tf.zeros( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
+        # trg_ones  = tf.ones( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
 
-        # initialize lists for printing data
-        MAE   = []
-        MSE   = []
-        SSIM  = []
-        PSNR  = []
-        index = []
-        table = []
-        processing_time_taken = []
+        # # initialize lists for printing data
+        # MAE   = []
+        # MSE   = []
+        # SSIM  = []
+        # PSNR  = []
+        # index = []
+        # table = []
+        # processing_time_taken = []
 
-        print('\n\n\n->> "I\'m sorry, Dave. You will have to wait a little while I process... Regards, HAL 9000 ◍ <<- \n\n\n')
+        # print('\n\n\n->> "I\'m sorry, Dave. You will have to wait a little while I process... Regards, HAL 9000 ◍ <<- \n\n\n')
 
-        # for all images in the test folder
-        for i in range(self.number_of_test_images):
+        # # for all images in the test folder
+        # for i in range(self.number_of_test_images):
 
-            self.start_time = time.time()
+        #     self.start_time = time.time()
 
-            # Randomly generate target labels for more robustness instead of a hard value of 1
-            self.TARGET_LABELS = tf.random.uniform( [],  minval=0.8, maxval=1.2, dtype=tf.float32 )
+        #     # Randomly generate target labels for more robustness instead of a hard value of 1
+        #     self.TARGET_LABELS = tf.random.uniform( [],  minval=0.8, maxval=1.2, dtype=tf.float32 )
 
-            # Get the image
-            element = test_iterator.get_next()
-            if args.calc_metrics == True:
-                self.rgb_testImage   = element[0]
-                self.gt  = element[1]
-            else:
-                self.rgb_testImage   = element
+        #     # Get the image
+        #     element = test_iterator.get_next()
+        #     if args.calc_metrics == True:
+        #         self.rgb_testImage   = element[0]
+        #         self.gt  = element[1]
+        #     else:
+        #         self.rgb_testImage   = element
 
-            # Setting target labels for Cyclic generation
-            self.target_label_ED     = tf.Variable( [0,0,0,0,self.TARGET_LABELS],  dtype=tf.float32 )
+        #     # Setting target labels for Cyclic generation
+        #     self.target_label_ED     = tf.Variable( [0,0,0,0,self.TARGET_LABELS],  dtype=tf.float32 )
 
-            # setting both G and D as non-trainable
-            self.G.trainable = False
-            self.D.trainable = False
+        #     # setting both G and D as non-trainable
+        #     self.G.trainable = False
+        #     self.D.trainable = False
 
-            # setting ED as input image and other channels as zero
-            RGBInput = tf.image.rgb_to_yuv( self.rgb_testImage[:, :, :, :] )
+        #     # setting ED as input image and other channels as zero
+        #     RGBInput = tf.image.rgb_to_yuv( self.rgb_testImage[:, :, :, :] )
 
-            # Generating the specular mask from the input RGB image
-            self.specular_candidate = self.Shen2009_specular_candidate( RGBInput[:, :, :, 0, tf.newaxis] )
-            # plot_single_image ( self.specular_candidate, title="Specular Candidate" )
+        #     # Generating the specular mask from the input RGB image
+        #     self.specular_candidate = self.Shen2009_specular_candidate( RGBInput[:, :, :, 0, tf.newaxis] )
+        #     # plot_single_image ( self.specular_candidate, title="Specular Candidate" )
 
-            # setting the CbCr same as the input image
-            averageCbCr = RGBInput[:, :, :, 1:]
+        #     # setting the CbCr same as the input image
+        #     averageCbCr = RGBInput[:, :, :, 1:]
 
-            # Y channel input are set to zero and the input is 0 degree
-            ych_inp1 = RGBInput[:, :, :, 0, tf.newaxis]
-            ych_inp2 = tmp_zeros
-            ych_inp3 = tmp_zeros
-            ych_inp4 = tmp_zeros
-            ych_inp5 = tmp_zeros
-            # generate the inputs
-            rand_input_Ych = tf.concat( [ych_inp1, ych_inp2, ych_inp3, ych_inp4, ych_inp5], axis = 3 )
+        #     # Y channel input are set to zero and the input is 0 degree
+        #     ych_inp1 = RGBInput[:, :, :, 0, tf.newaxis]
+        #     ych_inp2 = tmp_zeros
+        #     ych_inp3 = tmp_zeros
+        #     ych_inp4 = tmp_zeros
+        #     ych_inp5 = tmp_zeros
+        #     # generate the inputs
+        #     rand_input_Ych = tf.concat( [ych_inp1, ych_inp2, ych_inp3, ych_inp4, ych_inp5], axis = 3 )
 
-            self.gen_input          = tf.concat( [rand_input_Ych, tmp_zeros, tmp_zeros, tmp_zeros, tmp_zeros, trg_ones], axis = 3 )
-            self.target_img         = self.rgb_testImage
-            self.Target_angle_label = self.target_label_ED
+        #     self.gen_input          = tf.concat( [rand_input_Ych, tmp_zeros, tmp_zeros, tmp_zeros, tmp_zeros, trg_ones], axis = 3 )
+        #     self.target_img         = self.rgb_testImage
+        #     self.Target_angle_label = self.target_label_ED
 
-            # test plot the input
-            # debug_plot( self.gen_input )
+        #     # test plot the input
+        #     # debug_plot( self.gen_input )
 
-            """--------------------G(1)-------------------"""
-            self.inp_rgb   = self.G ( self.gen_input, training=False )
-            gen_YCbCr   = tf.concat( [self.inp_rgb, averageCbCr], axis = 3 )
-            self.gen_mask   = tf.image.yuv_to_rgb( gen_YCbCr )
+        #     """--------------------G(1)-------------------"""
+        #     self.inp_rgb   = self.G ( self.gen_input, training=False )
+        #     gen_YCbCr   = tf.concat( [self.inp_rgb, averageCbCr], axis = 3 )
+        #     self.gen_mask   = tf.image.yuv_to_rgb( gen_YCbCr )
 
-            orig_Ych = self.gen_mask[:, :, :, 0, tf.newaxis]
+        #     orig_Ych = self.gen_mask[:, :, :, 0, tf.newaxis]
 
-            # plot_single_image ( self.gen_Y )
-            # plot_single_image ( self.gen_rgb, title="Generated RGB" )
+        #     # plot_single_image ( self.gen_Y )
+        #     # plot_single_image ( self.gen_rgb, title="Generated RGB" )
 
-            processing_time_taken.append( (time.time() - self.start_time) )
+        #     processing_time_taken.append( (time.time() - self.start_time) )
 
-            # self.test_plot()
+        #     # self.test_plot()
 
-            #  ---------------------- COMET Logging ------------------------
-            # Plotting output of G1
-            self.comet_experiment.log_image( tf.squeeze( (self.inp_rgb) ), name="G1 Y-ch", step=i)
-            self.comet_experiment.log_image( tf.squeeze((self.gen_mask)), name="G1 RGB", step=i)
-            if args.calc_metrics == True:
-                self.comet_experiment.log_image( tf.squeeze(self.gt), name="2. Target Diffuse ", step=i)
-            #  ---------------------- PyPlt printing ------------------------
+        #     #  ---------------------- COMET Logging ------------------------
+        #     # Plotting output of G1
+        #     self.comet_experiment.log_image( tf.squeeze( (self.inp_rgb) ), name="G1 Y-ch", step=i)
+        #     self.comet_experiment.log_image( tf.squeeze((self.gen_mask)), name="G1 RGB", step=i)
+        #     if args.calc_metrics == True:
+        #         self.comet_experiment.log_image( tf.squeeze(self.gt), name="2. Target Diffuse ", step=i)
+        #     #  ---------------------- PyPlt printing ------------------------
 
-            # image_grid( self.cyc_gen0_rgb, self.cyc_gen45_rgb, self.cyc_gen90_rgb, self.cyc_gen135_rgb, self.cyc_genED_rgb )
-            # plot the generated images :fingerscrossed:
-            # plot_single_image ( self.cyc_gen0_rgb )
-            # plot_single_image ( self.cyc_gen45_rgb )
-            # plot_single_image ( self.cyc_gen90_rgb )
-            # plot_single_image ( self.cyc_gen135_rgb )
-            # plot_single_image ( self.cyc_genED_rgb )
-            # plt.close("all")
-            # gc.collect()
+        #     # image_grid( self.cyc_gen0_rgb, self.cyc_gen45_rgb, self.cyc_gen90_rgb, self.cyc_gen135_rgb, self.cyc_genED_rgb )
+        #     # plot the generated images :fingerscrossed:
+        #     # plot_single_image ( self.cyc_gen0_rgb )
+        #     # plot_single_image ( self.cyc_gen45_rgb )
+        #     # plot_single_image ( self.cyc_gen90_rgb )
+        #     # plot_single_image ( self.cyc_gen135_rgb )
+        #     # plot_single_image ( self.cyc_genED_rgb )
+        #     # plt.close("all")
+        #     # gc.collect()
 
-            # ----------------- calculating Metrics -------------------
-            # calculate only if the flag is true
-            if args.calc_metrics == True:
-                index.append(i+1)
+        #     # ----------------- calculating Metrics -------------------
+        #     # calculate only if the flag is true
+        #     if args.calc_metrics == True:
+        #         index.append(i+1)
 
-                # FID_score   = self.calculate_FID( self.cyc_genED_rgb , self.target_img )
-                SSIM.append( (tf.image.ssim ( rescale_01( self.gen_mask ), rescale_01( self.gt ), 5 )).numpy() )
-                PSNR.append( (tf.image.psnr ( self.gen_mask , self.gt, max_val=255 )).numpy() )
+        #         # FID_score   = self.calculate_FID( self.cyc_genED_rgb , self.target_img )
+        #         SSIM.append( (tf.image.ssim ( rescale_01( self.gen_mask ), rescale_01( self.gt ), 5 )).numpy() )
+        #         PSNR.append( (tf.image.psnr ( self.gen_mask , self.gt, max_val=255 )).numpy() )
 
-                # Calculate L1 loss to original image?
-                # Or use builtin functions to evaluate the Generator?
-                L2_loss = tf.keras.losses.MeanSquaredError()
-                MSE.append( L2_loss(self.gen_mask, self.gt ).numpy() )
+        #         # Calculate L1 loss to original image?
+        #         # Or use builtin functions to evaluate the Generator?
+        #         L2_loss = tf.keras.losses.MeanSquaredError()
+        #         MSE.append( L2_loss(self.gen_mask, self.gt ).numpy() )
 
-                # print ( 'Processing Image# {}: {:.3f} secs, MSE:{:.4f}, SSIM:{:.4f}, PSNR:{:.4f} \n' .format( i, processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]) )
+        #         # print ( 'Processing Image# {}: {:.3f} secs, MSE:{:.4f}, SSIM:{:.4f}, PSNR:{:.4f} \n' .format( i, processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]) )
 
-                # populate table
-                column = [index[i], processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]]
-                table.append(column)
+        #         # populate table
+        #         column = [index[i], processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]]
+        #         table.append(column)
 
-                # # print table inline
-                # print( tabulate( table, tablefmt="plain" ))
+        #         # # print table inline
+        #         # print( tabulate( table, tablefmt="plain" ))
 
-                self.comet_experiment.log_metric ( "Processing Time", processing_time_taken[i], step=i  )
-                self.comet_experiment.log_metric ( "MSE", MSE[i], step=i  )
-                self.comet_experiment.log_metric ( "SSIM", SSIM[i], step=i  )
-                self.comet_experiment.log_metric ( "PSNR", PSNR[i], step=i  )
+        #         self.comet_experiment.log_metric ( "Processing Time", processing_time_taken[i], step=i  )
+        #         self.comet_experiment.log_metric ( "MSE", MSE[i], step=i  )
+        #         self.comet_experiment.log_metric ( "SSIM", SSIM[i], step=i  )
+        #         self.comet_experiment.log_metric ( "PSNR", PSNR[i], step=i  )
 
-        # Print metrics only if flag is true
-        if args.calc_metrics == True:
-            print('\n\n --- PRINTING ALL CALCUATED METRICS --- ')
-            print(tabulate(table, headers=['Image#', 'Time', 'MSE', 'SSIM', 'PSNR']))
+        # # Print metrics only if flag is true
+        # if args.calc_metrics == True:
+        #     print('\n\n --- PRINTING ALL CALCUATED METRICS --- ')
+        #     print(tabulate(table, headers=['Image#', 'Time', 'MSE', 'SSIM', 'PSNR']))
 
-            # Calculating mean values
-            mean_mse  = sum(MSE) / len(MSE)
-            mean_ssim = sum(SSIM) / len(SSIM)
-            mean_psnr = sum(PSNR) / len(PSNR)
-            print('\n\n --- PRINTING MEAN METRICS --- ')
-            mean_metrics = [mean_mse, mean_ssim, mean_psnr]
-            print(tabulate([mean_metrics], headers=['Mean MSE', 'Mean SSIM', 'Mean PSNR']))
-            print('\n\n' )
+        #     # Calculating mean values
+        #     mean_mse  = sum(MSE) / len(MSE)
+        #     mean_ssim = sum(SSIM) / len(SSIM)
+        #     mean_psnr = sum(PSNR) / len(PSNR)
+        #     print('\n\n --- PRINTING MEAN METRICS --- ')
+        #     mean_metrics = [mean_mse, mean_ssim, mean_psnr]
+        #     print(tabulate([mean_metrics], headers=['Mean MSE', 'Mean SSIM', 'Mean PSNR']))
+        #     print('\n\n' )
 
-            # saving all the calculated metrics as txt
-            with open("SSIM.txt", 'wb+') as file1:
-                pickle.dump(SSIM, file1)
+        #     # saving all the calculated metrics as txt
+        #     with open("SSIM.txt", 'wb+') as file1:
+        #         pickle.dump(SSIM, file1)
 
-            with open("MSE.txt", 'wb+') as file2:
-                pickle.dump(MSE, file2)
+        #     with open("MSE.txt", 'wb+') as file2:
+        #         pickle.dump(MSE, file2)
 
-            with open("PSNR.txt", 'wb+') as file3:
-                pickle.dump(PSNR, file3)
+        #     with open("PSNR.txt", 'wb+') as file3:
+        #         pickle.dump(PSNR, file3)
 
-            # logging means to Comet also before closing experiment
-            # self.comet_experiment.log_other( value = MSE, key="All MSE")
-            # self.comet_experiment.log_other( value = SSIM, key="All SSIM")
-            # self.comet_experiment.log_other( value = PSNR, key="All PSNR")
-            self.comet_experiment.log_other( value = mean_mse,  key="Mean MSE")
-            self.comet_experiment.log_other( value = mean_ssim, key="Mean SSIM")
-            self.comet_experiment.log_other( value = mean_psnr, key="Mean PSNR")
+        #     # logging means to Comet also before closing experiment
+        #     # self.comet_experiment.log_other( value = MSE, key="All MSE")
+        #     # self.comet_experiment.log_other( value = SSIM, key="All SSIM")
+        #     # self.comet_experiment.log_other( value = PSNR, key="All PSNR")
+        #     self.comet_experiment.log_other( value = mean_mse,  key="Mean MSE")
+        #     self.comet_experiment.log_other( value = mean_ssim, key="Mean SSIM")
+        #     self.comet_experiment.log_other( value = mean_psnr, key="Mean PSNR")
 
-        self.comet_experiment.end()
+        # self.comet_experiment.end()
 
-        print('\n\n\n->> "Thank you for a very enjoyable game - HAL 9000 ◍ <<- \n\n\n')
+        # print('\n\n\n->> "Thank you for a very enjoyable game - HAL 9000 ◍ <<- \n\n\n')
 
 
 
@@ -1168,6 +1196,21 @@ class SpecSeg( object ):
         denominator = tf.reduce_sum(y_true + y_pred)
 
         return (1 - numerator / denominator)
+
+
+    # Sauce: https://www.tensorflow.org/tutorials/images/segmentation?hl=en
+    def display(self, display_list):
+        plt.figure(figsize=(15, 15))
+
+        title = ['Input Image', 'True Mask', 'Predicted Mask']
+
+        for i in range(len(display_list)):
+            plt.subplot(1, len(display_list), i+1)
+            plt.title(title[i])
+            plt.imshow( tf.keras.preprocessing.image.array_to_img (display_list[i]))
+            plt.axis('off')
+        plt.show()
+
 
 
     # ------------------------------------------------
