@@ -68,8 +68,9 @@ def parse_args():
 
     # Directories.
     # parser.add_argument( '--data_dir', default = '/home/atif/Documents/Datasets/SHMGAN_dataset/PolarImages', help = 'Path to polarimetric images' )
-    parser.add_argument( '--data_dir', default = '/home/atif/Documents/Datasets/WHU-specular-dataset/', help = 'Path to Spercular images' )
-    parser.add_argument( '--test_dir', default = '/home/atif/Documents/Datasets/WHU-specular-dataset/', help = 'Path to Specular masks' )
+    parser.add_argument( '--data_dir', default = '/home/atif/Documents/Datasets/WHU-specular-dataset/train', help = 'Path to Spercular images' )
+    parser.add_argument( '--test_dir', default = '/home/atif/Documents/Datasets/WHU-specular-dataset/test', help = 'Path to Specular masks' )
+    parser.add_argument( '--val_dir', default = '/home/atif/Documents/Datasets/WHU-specular-dataset/test', help = 'Path to Specular Validation images' )
     # parser.add_argument( '--test_dir', default = '/home/atif/Documents/Datasets/PSD_Dataset/PSD_val/PSD_val_specular', help = 'Path to polarimetric images' )
     # parser.add_argument( '--test_dir', default = '/home/atif/Documents/Datasets/PSD_Dataset/PSD_Test/PSD_Test_specular', help = 'Path to polarimetric images' )
     # parser.add_argument( '--diffuse_dir', default = '/home/atif/Documents/Datasets/PSD_Dataset/PSD_Test/PSD_Test_diffuse', help = 'Path to diffuse images' )
