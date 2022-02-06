@@ -85,13 +85,13 @@ def unet_sreeni( args ):
 
     #Sanity check, view few mages
 
-    image_number = random.randint(0, len(X_train))
-    plt.figure(figsize=(12, 6))
-    plt.subplot(121)
-    plt.imshow(np.reshape(X_train[image_number], (256, 256)), cmap='gray')
-    plt.subplot(122)
-    plt.imshow(np.reshape(y_train[image_number], (256, 256)), cmap='gray')
-    plt.show()
+    # image_number = random.randint(0, len(X_train))
+    # plt.figure(figsize=(12, 6))
+    # plt.subplot(121)
+    # plt.imshow(np.reshape(X_train[image_number], (256, 256)), cmap='gray')
+    # plt.subplot(122)
+    # plt.imshow(np.reshape(y_train[image_number], (256, 256)), cmap='gray')
+    # plt.show()
 
     ###############################################################
     IMG_HEIGHT = image_dataset.shape[1]
@@ -105,7 +105,7 @@ def unet_sreeni( args ):
 
 
     #If starting with pre-trained weights. 
-    #model.load_weights('mitochondria_gpu_tf1.4.hdf5')
+    model.load_weights('spec_seg.hdf5')
 
     history = model.fit(X_train, y_train, 
                         batch_size = 16, 
@@ -114,7 +114,7 @@ def unet_sreeni( args ):
                         validation_data=(X_test, y_test), 
                         shuffle=False)
 
-    model.save('mitochondria_test.hdf5')
+    # model.save('spec_seg.hdf5')
 
     ############################################################
     #Evaluate the model
@@ -137,10 +137,10 @@ def unet_sreeni( args ):
     plt.legend()
     plt.show()
 
-    acc = history.history['acc']
-    #acc = history.history['accuracy']
-    val_acc = history.history['val_acc']
-    #val_acc = history.history['val_accuracy']
+    # acc = history.history['accuracy']
+    acc = history.history['accuracy']
+    # val_acc = history.history['val_acc']
+    val_acc = history.history['val_accuracy']
 
     plt.plot(epochs, acc, 'y', label='Training acc')
     plt.plot(epochs, val_acc, 'r', label='Validation acc')
