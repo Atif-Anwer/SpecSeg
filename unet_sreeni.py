@@ -98,23 +98,21 @@ def unet_sreeni( args ):
     IMG_WIDTH  = image_dataset.shape[2]
     IMG_CHANNELS = image_dataset.shape[3]
 
-    def get_model():
-        return simple_unet_model(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS)
-
-    model = get_model()
+    model = simple_unet_model(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS)
 
 
-    #If starting with pre-trained weights. 
-    model.load_weights('spec_seg.hdf5')
+
+    # #If starting with pre-trained weights. 
+    # # model.load_weights('spec_seg.hdf5')
 
     history = model.fit(X_train, y_train, 
                         batch_size = 16, 
                         verbose=1, 
-                        epochs=1, 
+                        epochs=10, 
                         validation_data=(X_test, y_test), 
                         shuffle=False)
 
-    # model.save('spec_seg.hdf5')
+    model.save('spec_seg.hdf5')
 
     ############################################################
     #Evaluate the model
@@ -162,8 +160,9 @@ def unet_sreeni( args ):
 
     #######################################################################
     #Predict on a few images
-    model = get_model()
-    model.load_weights('mitochondria_50_plus_100_epochs.hdf5') #Trained for 50 epochs and then additional 100
+    model = simple_unet_model(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS)
+
+    model.load_weights('spec_seg.hdf5') #Trained for 50 epochs and then additional 100
     #model.load_weights('mitochondria_gpu_tf1.4.hdf5')  #Trained for 50 epochs
 
     test_img_number = random.randint(0, len(X_test))
@@ -173,7 +172,9 @@ def unet_sreeni( args ):
     test_img_input=np.expand_dims(test_img_norm, 0)
     prediction = (model.predict(test_img_input)[0,:,:,0] > 0.2).astype(np.uint8)
 
-    test_img_other = cv2.imread('data/test_images/02-1_256.tif', 0)
+    test_img_other = cv2.imread('/home/atif/Documents/Datasets/WHU-specular-dataset/test/HighlightMasks/03036.png', 0)
+    test_img_other = Image.fromarray(test_img_other)
+    test_img_other = test_img_other.resize( (SIZE, SIZE) )
     #test_img_other = cv2.imread('data/test_images/img8.tif', 0)
     test_img_other_norm = np.expand_dims(normalize(np.array(test_img_other), axis=1),2)
     test_img_other_norm=test_img_other_norm[:,:,0][:,:,None]
