@@ -1,6 +1,6 @@
 """
 # -----------------------------------------------------------
-SHMGAN -  Detection of Specular Highlights
+SpecSeg -  Segmentation of Specular Highlights
 
 Uses Packages:
     Python 3.8
@@ -73,13 +73,6 @@ os.environ['TF_ENABLE_AUTO_MIXED_PRECISION'] = '1'
 tf.config.run_functions_eagerly(True)
 tf.data.experimental.enable_debug_mode()
 
-# adaptive discriminator augmentation
-max_translation = 0.125
-max_rotation = 0.125
-max_zoom = 0.25
-target_accuracy = 0.85
-integration_steps = 1000
-
 # ------------------------------------------------
 # =============== THE MAIN CLASS ===============
 # ------------------------------------------------
@@ -97,26 +90,26 @@ class SpecSeg( object ):
 
         # only create Comet experiment if training, not testing
         # Create an experiment with your api key
-        if args.mode == 'train':
-            self.comet_experiment = Experiment(
-                api_key                            = "doJU3H6SCSuhOYCdYC4s50olk",
-                project_name                       = "specseg",
-                workspace                          = "atifanwer",
-                auto_param_logging                 = True,
-                auto_metric_logging                = True,
-                log_env_details                    = True,
-                log_code                           = True,                        # code logging
-                log_graph                          = True,
-                log_env_gpu                        = True,
-                log_env_host                       = True,
-                log_env_cpu                        = True,
-                auto_histogram_tensorboard_logging = True,
-                auto_histogram_weight_logging      = True,
-                auto_histogram_gradient_logging    = True,
-                auto_histogram_activation_logging  = True,
-                # auto_histogram_epoch_rate=1,
-            )
-            self.comet_experiment.add_tag("SpecSeg_test")
+        # if args.mode == 'train':
+        #     self.comet_experiment = Experiment(
+        #         api_key                            = "doJU3H6SCSuhOYCdYC4s50olk",
+        #         project_name                       = "specseg",
+        #         workspace                          = "atifanwer",
+        #         auto_param_logging                 = True,
+        #         auto_metric_logging                = True,
+        #         log_env_details                    = True,
+        #         log_code                           = True,                        # code logging
+        #         log_graph                          = True,
+        #         log_env_gpu                        = True,
+        #         log_env_host                       = True,
+        #         log_env_cpu                        = True,
+        #         auto_histogram_tensorboard_logging = True,
+        #         auto_histogram_weight_logging      = True,
+        #         auto_histogram_gradient_logging    = True,
+        #         auto_histogram_activation_logging  = True,
+        #         # auto_histogram_epoch_rate=1,
+        #     )
+        #     self.comet_experiment.add_tag("SpecSeg_test")
 
         # Model configuration.
         self.c_dim        = args.c_dim
@@ -212,13 +205,12 @@ class SpecSeg( object ):
 
     # ------------------------------------------------
     #
-    #  ██████  ███████ ███    ██ ███████ ██████   █████  ████████  ██████  ██████
-    # ██       ██      ████   ██ ██      ██   ██ ██   ██    ██    ██    ██ ██   ██
-    # ██   ███ █████   ██ ██  ██ █████   ██████  ███████    ██    ██    ██ ██████
-    # ██    ██ ██      ██  ██ ██ ██      ██   ██ ██   ██    ██    ██    ██ ██   ██
-    #  ██████  ███████ ██   ████ ███████ ██   ██ ██   ██    ██     ██████  ██   ██
-    #
-    # Generator has two inputs and one output
+    # ██    ██       ███    ██ ███████ ████████
+    # ██    ██       ████   ██ ██         ██
+    # ██    ██ █████ ██ ██  ██ █████      ██
+    # ██    ██       ██  ██ ██ ██         ██
+    #  ██████        ██   ████ ███████    ██
+# Generator has two inputs and one output
     # INPUT: Concatenated multiple 5x Y-channel images (with concatenated label channels)
     # OUTPUT: Single Image (Single Y channel only - concatenate with CbCr after generation) (generated_image)
     # ------------------------------------------------
@@ -326,18 +318,19 @@ class SpecSeg( object ):
             # x = LeakyReLU()( x )
         # ----u4
         N /= 2
-        x = Conv2DTranspose( filters = N, kernel_size = 3, strides = 2, padding = "same", kernel_initializer=self.init, activation=tf.nn.relu  )( x )
-        x = Concatenate()( [x, down1] )
-        for i in range( 2 ):
-            x = Conv2D( filters = N, kernel_size = 3, strides = 1, padding = "same", kernel_initializer=self.init, activation=tf.nn.relu, kernel_regularizer=regularizers.l2(0.001) )( x )
-            x = InstanceNormalization( axis = -1, epsilon=0.000001, center=True,  beta_initializer=self.init  )( x )
+        genOutput = Conv2DTranspose( filters = 1, kernel_size = 3, strides = 2, padding = "same", kernel_initializer=self.init, activation=tf.nn.relu  )( x )
+        # x = Concatenate()( [x, down1] )
+        # for i in range( 2 ):
+        #     x = Conv2D( filters = N, kernel_size = 3, strides = 1, padding = "same", kernel_initializer=self.init, activation=tf.nn.relu, kernel_regularizer=regularizers.l2(0.001) )( x )
+        #     x = InstanceNormalization( axis = -1, epsilon=0.000001, center=True,  beta_initializer=self.init  )( x )
             # x = LeakyReLU()( x )
 
         # Output is a single Y channel image
-        genOutput = Conv2D( filters = 1, kernel_size = 1, strides = 1, padding = "same", kernel_initializer=self.init, activation=tf.nn.sigmoid)( x )
+        # genOutput = Conv2DTranspose( filters = 2, kernel_size = 3, strides = 2, padding = "same", kernel_initializer=self.init, activation=tf.nn.relu  )( x )
+        # genOutput = Conv2D( filters = 1, kernel_size = 1, strides = 1, padding = "same", kernel_initializer=self.init, activation=tf.nn.sigmoid)( x )
         return Model( inp_images, genOutput, name = 'SHM_Unet' )
 
-    
+
     #
     #  █████  ████████ ████████ ███████ ███    ██ ████████ ██  ██████  ███    ██
     # ██   ██    ██       ██    ██      ████   ██    ██    ██ ██    ██ ████   ██
@@ -429,44 +422,6 @@ class SpecSeg( object ):
 
             """----------------Losses--------------------"""
 
-            # aka G_gan_loss_cyc
-            # D3_RealFake_cyc1 = tf.math.reduce_mean( tf.math.squared_difference( self.inp_rgb, self.TARGET_LABELS ) )
-
-            # -------------------------------------------------
-
-            # oneHot lables will be of shape (1, 5)
-            # oneHot_lbl1 = tf.reshape(tf.one_hot(tf.cast(0,tf.uint8),5),[1,5])
-            # Categorical crossentropy = Softmax crossentropy (for multi-class classification)
-            # D3_classification_loss1 = tf.nn.softmax_cross_entropy_with_logits( labels = oneHot_lbl1, logits = label_cyc_gen0_D3   )
-
-            # mask_loss = tf.nn.sigmoid_cross_entropy_with_logits( labels = oneHot_lbl1, logits = self.inp_rgb)
-
-            # # The Least Squares Generative Adversarial Network, or LSGAN for short, is an extension to the GAN architecture that addresses the problem of vanishing gradients and loss saturation.
-            # # Using LSGAN for D2 and D4 outputs:
-            # # D_loss = 0.5 * tf.reduce_mean((D_real-1)^2) + tf.reduce_mean(D_fake^2)
-            # # G_loss = 0.5 * tf.reduce_mean((D_fake -1)^2)
-            # #  D2 + D1
-            # self.D2_RealFake_target = tf.math.reduce_mean( tf.math.squared_difference( self.RealFake_target_D2 , self.TARGET_LABELS )) + tf.math.reduce_mean( tf.math.square( self.RealFake_gen_D1 ) )
-            # # D4 + D3
-            # D4_1 = tf.math.reduce_mean( tf.math.squared_difference( RealFake_orig0_D4 , self.TARGET_LABELS ))   + tf.math.reduce_mean( tf.math.square( RealFake_cyc_gen0_D3 ) )
-            # D4_2 = tf.math.reduce_mean( tf.math.squared_difference( RealFake_orig45_D4 , self.TARGET_LABELS ))  + tf.math.reduce_mean( tf.math.square( RealFake_cyc_gen45_D3 ) )
-            # D4_3 = tf.math.reduce_mean( tf.math.squared_difference( RealFake_orig90_D4 , self.TARGET_LABELS ))  + tf.math.reduce_mean( tf.math.square( RealFake_cyc_gen90_D3 ) )
-            # D4_4 = tf.math.reduce_mean( tf.math.squared_difference( RealFake_orig135_D4 , self.TARGET_LABELS )) + tf.math.reduce_mean( tf.math.square( RealFake_cyc_gen135_D3 ) )
-            # D4_5 = tf.math.reduce_mean( tf.math.squared_difference( RealFake_origED_D4 , self.TARGET_LABELS ))  + tf.math.reduce_mean( tf.math.square( RealFake_cyc_genED_D3 ) )
-            # self.D4_RealFake_cyc = D4_1 + D4_2 + D4_3 + D4_4 + D4_5 + self.D2_RealFake_target
-
-            # D_loss = (self.D4_RealFake_cyc)/6.0 + (self.D4_classification_loss)/5.0
-
-            # --------------------      L1 Loss       --------------------
-            #  The cycle consistency loss is defined as the sum of the L1 distances between the real images from each domain and their generated counterparts.
-            # Source: https://github.com/AlamiMejjati/Unsupervised-Attention-guided-Image-to-Image-Translation/blob/master/losses.py
-            # L1_loss_G1    = tf.reduce_mean( tf.abs( self.gen_mask        - self.target_img ))
-
-             # --------------------      SPECULAR       --------------------
-            # Specular Loss - To foce ED generation
-            # Spec_loss1  = tf.reduce_mean( tf.math.square ( (cyc_gen0_yuv   * self.specular_candidate) - (ds1_yuv * self.specular_candidate ) ) )
-
-            # --------------------      TOTAL LOSSES       --------------------
             self.total_SpecSeg_loss      =    ( dice_loss )
                                                 # ( self.total_NST_loss ) * 10.0
                                                 # ( self.MS_SSIML1_loss )                                + \
@@ -513,7 +468,7 @@ class SpecSeg( object ):
         # ------------------------------------------------
         # Initialize and load the zipped dataset
         # NOTE: Images returned will be resized, Normalized (TBD) and randomly flipped (TBD)
-        self.length_dataset, Dataset = self.datasetLoad()
+        self.length_dataset, Dataset, self.test_datset = self.datasetLoad()
 
         # NOTE: Batch size is 1 for zipped dataset, so that 1 image from each polar angle is picked
         # batched_dataset = Dataset.batch( 4 )
@@ -571,11 +526,6 @@ class SpecSeg( object ):
 
             self.epoch = epoch
             print(f"\nStart of Training Epoch {self.epoch}")
-            # since batch will be 1 (to get all polar images in sequence), the number of batches
-            # will have to be equal to the length of the dataset. Also note that the randomness and shuffle
-            # are not in the dataset while loading, but introduced by randomizing input channels
-            # and randomizing lables while training (tf.cond ....)
-
 
             for batch in range( batches_per_epoch-1 ):
 
@@ -584,41 +534,66 @@ class SpecSeg( object ):
 
 
                 # # Randomly flip all images in the batch
-                # self.random_flip = tf.random.uniform( [], dtype=tf.float16 ) >= 0.5
+                self.random_flip = tf.random.uniform( [], dtype=tf.float16 ) >= 0.5
 
                 # Randomly generate target labels for more robustness instead of a hard value of 1
                 # self.TARGET_LABELS = tf.random.uniform( [],  minval=0.8, maxval=1.2, dtype=tf.float32 )
 
 
                 # Get the next set of images
-                element = iterator.get_next()
+                train_batches = iterator.get_next()
 
-                input_image = element[0]
-                input_mask  = element[1]
-                val_image  = element[2]
+                self.input_image = train_batches[0]
+                self.input_mask  = train_batches[1]
+
+                self.val_image  = self.test_datset
+
+                # self.display([self.input_image, self.input_mask])
+
+                OUTPUT_CLASSES = 2
+
+                # model = self.unet(output_channels=OUTPUT_CLASSES)
+                self.unet.compile(optimizer=self.optimizer_unet, loss=tf.keras.losses.BinaryCrossentropy(from_logits=True), metrics=['accuracy'])
+
+                self.show_predictions()
+
+                EPOCHS = 20
+                VAL_SUBSPLITS = 5
+                # VALIDATION_STEPS = info.splits['test'].num_examples//BATCH_SIZE//VAL_SUBSPLITS
+
+                model_history = self.unet.fit(self.input_image,epochs=EPOCHS,
+                                        callbacks=[DisplayCallback()])
+                                        # steps_per_epoch=batches_per_epoch,
+                                        # validation_steps=1,
+                                        # validation_data=self.test_datset,
+
+                trainer = self.unet.Trainer(name="oxford_iiit_pet", checkpoint_callback=False)
+                trainer.fit(unet_model,
+                            train_dataset,
+                            validation_dataset,
+                            epochs=25,
+                            batch_size=32)
+
+                loss = model_history.history['loss']
+                val_loss = model_history.history['val_loss']
+
+                plt.figure()
+                plt.plot(model_history.epoch, loss, 'r', label='Training loss')
+                plt.plot(model_history.epoch, val_loss, 'bo', label='Validation loss')
+                plt.title('Training and Validation Loss')
+                plt.xlabel('Epoch')
+                plt.ylabel('Loss Value')
+                plt.ylim([0, 1])
+                plt.legend()
+                plt.show()
 
 
-                self.train_step( input_image, input_mask )
+
+
+                # self.train_step( input_image, input_mask )
 
                 # for tensorboard (check if can be moved)
                 with file_writer.as_default():
-
-                    # # # Image grid
-                    # figure1 = image_grid( self.cyc_gen0_rgb, self.cyc_gen45_rgb, self.cyc_gen90_rgb, self.cyc_gen135_rgb, self.cyc_genED_rgb )
-                    # figure2 = image_grid( orig0, orig45, orig90, orig135, origED )
-                    # figure3 = image_grid( self.attention_map1, self.attention_map2, self.attention_map3, self.attention_map4, self.attention_map4 )
-
-                    # plt.close("all")
-
-                    # # ---------- COMET.ML -------------
-                    # Generating a confusion matrix for target angle and predicteabels )
-
-                    # Log some metrics but only 1 time and not every loop
-                    # if self.batch_step == 1:
-                        # logging other parameters for record peurposes
-                        # self.comet_experiment.log_other( value = self.train_G_after, key="Train G after n loops")
-                        # self.comet_experiment.log_other( value = self.dropout_amnt, key="Dropout amount")
-
 
                     # # Monitoring Losses
                     # log everything every n steps other than confusion matrices. Reduces time per epoch
@@ -724,9 +699,9 @@ class SpecSeg( object ):
                 ) \
                 .cache() \
                 .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+                .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 .prefetch(25)
                 # .map(lambda x: tf.image.per_image_standardization( x ) ) \
-                # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
         # Manually update the labels (?)
         rgb_images.class_names = 'RGB'
@@ -745,9 +720,9 @@ class SpecSeg( object ):
                 ) \
                 .cache() \
                 .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+                .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 .prefetch(25)
                 # .map(lambda x: tf.image.per_image_standardization( x ) ) \
-                # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
         masks.class_names = 'MASK'
 
@@ -765,15 +740,17 @@ class SpecSeg( object ):
                 ) \
                 .cache() \
                 .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+                .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 .prefetch(25)
                 # .map(lambda x: tf.image.per_image_standardization( x ) ) \
-                # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
                 # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
         # Manually update the labels (?)
         val_images.class_names = 'RGB Validation'
 
         # ZIP the datasets into one dataset
-        loadedDataset = tf.data.Dataset.zip ( ( rgb_images, masks, val_images ) )
+        loadedDataset = tf.data.Dataset.zip ( ( rgb_images, masks ) )
+        test_datset = tf.data.Dataset.zip ( val_images )
+
         # dataset.map(time_consuming_mapping).cache().map(memory_consuming_mapping)
 
         # Sauce: https://www.tensorflow.org/guide/data_performance_analysis#3_are_you_reaching_high_cpu_utilization
@@ -793,322 +770,7 @@ class SpecSeg( object ):
         # return the number of files loaded , to calculate iterations per batch
         self.length_dataset = len(np.concatenate([i for i in rgb_images], axis=0))
         # returns the zipped dataset for use with iterator
-        return self.length_dataset, self.loadedDataset
-
-    """
-    # ------------------------------------------------
-    #
-    # ████████ ███████ ███████ ████████
-    #    ██    ██      ██         ██
-    #    ██    █████   ███████    ██
-    #    ██    ██           ██    ██
-    #    ██    ███████ ███████    ██
-    #
-    # TEST FUNCTION FOR SHMGAN
-    # The test function has the following features:
-    # - Load RGB image from test folder as I0 (or Itot)
-    # - Set all other layers to zero
-    # - Set target image label as ED
-    # - Average CbCr is replaced with CbCr of the image
-    # - Generate images. Both G1 and G_cyclic
-    # - No need for losses
-    # ------------------------------------------------
-    """
-    def test( self, args ):
-
-        # self.comet_experiment = Experiment(
-        #         api_key                            = "doJU3H6SCSuhOYCdYC4s50olk",
-        #         project_name                       = "shm",
-        #         workspace                          = "atifanwer",
-        #         auto_param_logging                 = True,
-        #         auto_metric_logging                = True,
-        #         log_env_details                    = True,
-        #         log_code                           = True,                        # code logging
-        #         log_graph                          = True,
-        #         log_env_gpu                        = True,
-        #         log_env_host                       = True,
-        #         log_env_cpu                        = True,
-        #         auto_histogram_tensorboard_logging = True,
-        #         auto_histogram_weight_logging      = True,
-        #         auto_histogram_gradient_logging    = True,
-        #         auto_histogram_activation_logging  = True,
-        #         # auto_histogram_epoch_rate=1,
-        #     )
-        # self.comet_experiment.add_tag("SPECSEG TEST RUN")
-
-        # Do not flip the image
-        self.random_flip = 0.0
-        # do not randomize target label values
-        self.TARGET_LABELS = 1.0
-
-        # Disable deleting by mistake
-        self.delete_old_checkpoints = False
-
-        # Step1: Load the test images
-        rootfolder = args.test_dir
-        # testpath = pathlib.Path( rootfolder )
-        # # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
-        # # the dataset loading images
-        # test_images = tf.keras.preprocessing.image_dataset_from_directory(
-        #         str( testpath ),
-        #           labels           = None,
-        #         # label_mode       = 'categorical',
-        #           color_mode       = 'rgb',
-        #           validation_split = None,
-        #           shuffle          = False,
-        #           seed             = 1337,
-        #           image_size       = (self.image_size, self.image_size),
-        #           batch_size       = 1
-        #         ) \
-        #         .cache() \
-        #         .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
-        #         .map(lambda x: tf.image.per_image_standardization( x ) ) \
-        #         .prefetch(25)
-        #         # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
-        #         # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
-        # test_images.class_names = 'TEST'
-
-        # # Only load diffuse images if the flag is True
-        # if args.calc_metrics == True:
-        #     diffusefolder = args.diffuse_dir
-        #     diffusepath = pathlib.Path( diffusefolder )
-        #     # NOTE: While loading the images, only difference is that the images are not flipped. Otherwise it is the same function as
-        #     # the dataset loading images
-        #     diffuse_images = tf.keras.preprocessing.image_dataset_from_directory(
-        #             str( diffusepath ),
-        #             labels           = None,
-        #             # label_mode       = 'categorical',
-        #             color_mode       = 'rgb',
-        #             validation_split = None,
-        #             shuffle          = False,
-        #             seed             = 1337,
-        #             image_size       = (self.image_size, self.image_size),
-        #             batch_size       = 1
-        #             ) \
-        #             .cache() \
-        #             .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE ) \
-        #             .map(lambda x: tf.image.per_image_standardization( x ) ) \
-        #             .prefetch(25)
-        #             # .map(lambda x: x if self.random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
-        #             # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE ) \
-        #     test_images.class_names = 'TEST'
-
-        # # return the number of files loaded
-        # self.number_of_test_images = len(np.concatenate([i for i in test_images], axis=0))
-
-        # # ZIP the datasets into one dataset
-        # if args.calc_metrics == True:
-        #     loadedDataset = tf.data.Dataset.zip ( ( test_images, diffuse_images ) )
-        # else:
-        #     loadedDataset = tf.data.Dataset.zip ( test_images )
-
-        # options = tf.data.Options()
-        # options.experimental_threading.max_intra_op_parallelism = 1
-        # loadedDataset = loadedDataset.with_options(options)
-        # loadedDataset = loadedDataset.cache().prefetch( buffer_size =25)
-
-        # # Load the G and D
-        # self.G = self.build_unet( )
-        # # self.D = self.build_discriminator( )
-        # # Print Model summary to console and file
-        # self.G.summary()
-        # self.D.summary()
-        # with open('Generator_summary.txt', 'w') as f:
-        #     self.G.summary(print_fn=lambda x: f.write(x + '\n'))
-        # with open('Discriminator_summary.txt', 'w') as f:
-        #     self.D.summary(print_fn=lambda x: f.write(x + '\n'))
-
-
-        # # STEP2: Load checkpoints
-        # checkpoint_dir    = self.checkpoint_save_dir
-        # ckpt = tf.train.Checkpoint( generator     = self.G,
-        #                             discriminator = self.D,
-        #                             optimizer_D   = self.optimizer_D,
-        #                             optimizer_G   = self.optimizer_G )
-        # ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_dir, max_to_keep=3)
-        # ckpt.restore(ckpt_manager.latest_checkpoint).expect_partial()
-        # print ('Latest checkpoint restored!!')
-
-        # plt.close("all")
-        # gc.collect()
-
-        # # STEP3: Iterate over the loaded test images
-        # test_iterator = iter(loadedDataset)
-
-        # # create zeros and ones for labels
-        # tmp_zeros = tf.zeros( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
-        # trg_ones  = tf.ones( [1, self.image_size, self.image_size, 1], dtype=tf.float32 )
-
-        # # initialize lists for printing data
-        # MAE   = []
-        # MSE   = []
-        # SSIM  = []
-        # PSNR  = []
-        # index = []
-        # table = []
-        # processing_time_taken = []
-
-        # print('\n\n\n->> "I\'m sorry, Dave. You will have to wait a little while I process... Regards, HAL 9000 ◍ <<- \n\n\n')
-
-        # # for all images in the test folder
-        # for i in range(self.number_of_test_images):
-
-        #     self.start_time = time.time()
-
-        #     # Randomly generate target labels for more robustness instead of a hard value of 1
-        #     self.TARGET_LABELS = tf.random.uniform( [],  minval=0.8, maxval=1.2, dtype=tf.float32 )
-
-        #     # Get the image
-        #     element = test_iterator.get_next()
-        #     if args.calc_metrics == True:
-        #         self.rgb_testImage   = element[0]
-        #         self.gt  = element[1]
-        #     else:
-        #         self.rgb_testImage   = element
-
-        #     # Setting target labels for Cyclic generation
-        #     self.target_label_ED     = tf.Variable( [0,0,0,0,self.TARGET_LABELS],  dtype=tf.float32 )
-
-        #     # setting both G and D as non-trainable
-        #     self.G.trainable = False
-        #     self.D.trainable = False
-
-        #     # setting ED as input image and other channels as zero
-        #     RGBInput = tf.image.rgb_to_yuv( self.rgb_testImage[:, :, :, :] )
-
-        #     # Generating the specular mask from the input RGB image
-        #     self.specular_candidate = self.Shen2009_specular_candidate( RGBInput[:, :, :, 0, tf.newaxis] )
-        #     # plot_single_image ( self.specular_candidate, title="Specular Candidate" )
-
-        #     # setting the CbCr same as the input image
-        #     averageCbCr = RGBInput[:, :, :, 1:]
-
-        #     # Y channel input are set to zero and the input is 0 degree
-        #     ych_inp1 = RGBInput[:, :, :, 0, tf.newaxis]
-        #     ych_inp2 = tmp_zeros
-        #     ych_inp3 = tmp_zeros
-        #     ych_inp4 = tmp_zeros
-        #     ych_inp5 = tmp_zeros
-        #     # generate the inputs
-        #     rand_input_Ych = tf.concat( [ych_inp1, ych_inp2, ych_inp3, ych_inp4, ych_inp5], axis = 3 )
-
-        #     self.gen_input          = tf.concat( [rand_input_Ych, tmp_zeros, tmp_zeros, tmp_zeros, tmp_zeros, trg_ones], axis = 3 )
-        #     self.target_img         = self.rgb_testImage
-        #     self.Target_angle_label = self.target_label_ED
-
-        #     # test plot the input
-        #     # debug_plot( self.gen_input )
-
-        #     """--------------------G(1)-------------------"""
-        #     self.inp_rgb   = self.G ( self.gen_input, training=False )
-        #     gen_YCbCr   = tf.concat( [self.inp_rgb, averageCbCr], axis = 3 )
-        #     self.gen_mask   = tf.image.yuv_to_rgb( gen_YCbCr )
-
-        #     orig_Ych = self.gen_mask[:, :, :, 0, tf.newaxis]
-
-        #     # plot_single_image ( self.gen_Y )
-        #     # plot_single_image ( self.gen_rgb, title="Generated RGB" )
-
-        #     processing_time_taken.append( (time.time() - self.start_time) )
-
-        #     # self.test_plot()
-
-        #     #  ---------------------- COMET Logging ------------------------
-        #     # Plotting output of G1
-        #     self.comet_experiment.log_image( tf.squeeze( (self.inp_rgb) ), name="G1 Y-ch", step=i)
-        #     self.comet_experiment.log_image( tf.squeeze((self.gen_mask)), name="G1 RGB", step=i)
-        #     if args.calc_metrics == True:
-        #         self.comet_experiment.log_image( tf.squeeze(self.gt), name="2. Target Diffuse ", step=i)
-        #     #  ---------------------- PyPlt printing ------------------------
-
-        #     # image_grid( self.cyc_gen0_rgb, self.cyc_gen45_rgb, self.cyc_gen90_rgb, self.cyc_gen135_rgb, self.cyc_genED_rgb )
-        #     # plot the generated images :fingerscrossed:
-        #     # plot_single_image ( self.cyc_gen0_rgb )
-        #     # plot_single_image ( self.cyc_gen45_rgb )
-        #     # plot_single_image ( self.cyc_gen90_rgb )
-        #     # plot_single_image ( self.cyc_gen135_rgb )
-        #     # plot_single_image ( self.cyc_genED_rgb )
-        #     # plt.close("all")
-        #     # gc.collect()
-
-        #     # ----------------- calculating Metrics -------------------
-        #     # calculate only if the flag is true
-        #     if args.calc_metrics == True:
-        #         index.append(i+1)
-
-        #         # FID_score   = self.calculate_FID( self.cyc_genED_rgb , self.target_img )
-        #         SSIM.append( (tf.image.ssim ( rescale_01( self.gen_mask ), rescale_01( self.gt ), 5 )).numpy() )
-        #         PSNR.append( (tf.image.psnr ( self.gen_mask , self.gt, max_val=255 )).numpy() )
-
-        #         # Calculate L1 loss to original image?
-        #         # Or use builtin functions to evaluate the Generator?
-        #         L2_loss = tf.keras.losses.MeanSquaredError()
-        #         MSE.append( L2_loss(self.gen_mask, self.gt ).numpy() )
-
-        #         # print ( 'Processing Image# {}: {:.3f} secs, MSE:{:.4f}, SSIM:{:.4f}, PSNR:{:.4f} \n' .format( i, processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]) )
-
-        #         # populate table
-        #         column = [index[i], processing_time_taken[i], MSE[i], SSIM[i], PSNR[i]]
-        #         table.append(column)
-
-        #         # # print table inline
-        #         # print( tabulate( table, tablefmt="plain" ))
-
-        #         self.comet_experiment.log_metric ( "Processing Time", processing_time_taken[i], step=i  )
-        #         self.comet_experiment.log_metric ( "MSE", MSE[i], step=i  )
-        #         self.comet_experiment.log_metric ( "SSIM", SSIM[i], step=i  )
-        #         self.comet_experiment.log_metric ( "PSNR", PSNR[i], step=i  )
-
-        # # Print metrics only if flag is true
-        # if args.calc_metrics == True:
-        #     print('\n\n --- PRINTING ALL CALCUATED METRICS --- ')
-        #     print(tabulate(table, headers=['Image#', 'Time', 'MSE', 'SSIM', 'PSNR']))
-
-        #     # Calculating mean values
-        #     mean_mse  = sum(MSE) / len(MSE)
-        #     mean_ssim = sum(SSIM) / len(SSIM)
-        #     mean_psnr = sum(PSNR) / len(PSNR)
-        #     print('\n\n --- PRINTING MEAN METRICS --- ')
-        #     mean_metrics = [mean_mse, mean_ssim, mean_psnr]
-        #     print(tabulate([mean_metrics], headers=['Mean MSE', 'Mean SSIM', 'Mean PSNR']))
-        #     print('\n\n' )
-
-        #     # saving all the calculated metrics as txt
-        #     with open("SSIM.txt", 'wb+') as file1:
-        #         pickle.dump(SSIM, file1)
-
-        #     with open("MSE.txt", 'wb+') as file2:
-        #         pickle.dump(MSE, file2)
-
-        #     with open("PSNR.txt", 'wb+') as file3:
-        #         pickle.dump(PSNR, file3)
-
-        #     # logging means to Comet also before closing experiment
-        #     # self.comet_experiment.log_other( value = MSE, key="All MSE")
-        #     # self.comet_experiment.log_other( value = SSIM, key="All SSIM")
-        #     # self.comet_experiment.log_other( value = PSNR, key="All PSNR")
-        #     self.comet_experiment.log_other( value = mean_mse,  key="Mean MSE")
-        #     self.comet_experiment.log_other( value = mean_ssim, key="Mean SSIM")
-        #     self.comet_experiment.log_other( value = mean_psnr, key="Mean PSNR")
-
-        # self.comet_experiment.end()
-
-        # print('\n\n\n->> "Thank you for a very enjoyable game - HAL 9000 ◍ <<- \n\n\n')
-
-
-
-        return
-
-    # ------------------------------------------
-    # PLOTTING TEST IMAGES POST TRAINING
-    def test_plot( self ):
-        figure = plt.figure( figsize=(10,15) )
-        figure.add_subplot( 2, 1, 1, title="Orig")
-        plt.imshow ( tf.squeeze( rescale_01( self.rgb_testImage ) ).numpy().astype("float32") )
-        figure.add_subplot( 2, 1, 2, title="Generated G1")
-        plt.imshow ( tf.squeeze( rescale_01( self.gen_mask ) ).numpy().astype("float32") )
-
-
+        return self.length_dataset, self.loadedDataset, test_datset
 
     # ------------------------------------------
     #
@@ -1189,6 +851,7 @@ class SpecSeg( object ):
         is_avg, is_std = calculate_inception_score(images)
         print('score', is_avg, is_std)
 
+    # ------------------------------------------
     def dice_loss( self, y_true, y_pred ):
         # y_true = tf.cast(y_true, tf.float32)
         y_pred = tf.math.sigmoid(y_pred)
@@ -1198,6 +861,7 @@ class SpecSeg( object ):
         return (1 - numerator / denominator)
 
 
+    # ------------------------------------------
     # Sauce: https://www.tensorflow.org/tutorials/images/segmentation?hl=en
     def display(self, display_list):
         plt.figure(figsize=(15, 15))
@@ -1205,11 +869,47 @@ class SpecSeg( object ):
         title = ['Input Image', 'True Mask', 'Predicted Mask']
 
         for i in range(len(display_list)):
-            plt.subplot(1, len(display_list), i+1)
+            plt.subplot(len(display_list), 1, i+1)
             plt.title(title[i])
-            plt.imshow( tf.keras.preprocessing.image.array_to_img (display_list[i]))
+            plt.imshow( (tf.squeeze(display_list[i])))
             plt.axis('off')
         plt.show()
+
+    # ------------------------------------------
+    def create_mask(self, pred_mask):
+        # pred_mask = tf.argmax(pred_mask, axis=-1)
+        # pred_mask = pred_mask[..., tf.newaxis]
+        # pred_mask = pred_mask[tf.newaxis, ...]
+        return pred_mask[0]
+
+    # ------------------------------------------
+    def show_predictions(self, dataset=None, num=1):
+        if dataset:
+            for image, mask in dataset.take(num):
+                pred_mask = self.unet.predict(image)
+                self.display([image[0], mask[0], self.create_mask(pred_mask)])
+        else:
+            aa = self.unet.predict(self.input_image)
+            # asdf = self.create_mask(aa)
+            self.display([self.input_image, self.input_mask, aa[:, :, :,0,tf.newaxis]])
+
+
+    # ------------------------------------------
+    # PLOTTING TEST IMAGES POST TRAINING
+    def test_plot( self ):
+        figure = plt.figure( figsize=(10,15) )
+        figure.add_subplot( 2, 1, 1, title="Orig")
+        plt.imshow ( tf.squeeze( rescale_01( self.rgb_testImage ) ).numpy().astype("float32") )
+        figure.add_subplot( 2, 1, 2, title="Generated G1")
+        plt.imshow ( tf.squeeze( rescale_01( self.gen_mask ) ).numpy().astype("float32") )
+
+
+class DisplayCallback(tf.keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        qq = SpecSeg()
+        # clear_output(wait=True)
+        qq.show_predictions()
+        print ('\nSample Prediction after epoch {}\n'.format(epoch+1))
 
 
 
