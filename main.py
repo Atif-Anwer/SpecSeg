@@ -24,7 +24,7 @@ import tensorflow as tf
 # import io
 import matplotlib.pyplot as plt
 import numpy as np
-from SpecSeg import SpecSeg
+# from SpecSeg import SpecSeg
 # from ShmGAN_2input import ShmGAN_2input
 from datetime import datetime
 from tensorflow import keras
@@ -33,6 +33,8 @@ from utils import check_gpu
 # from tensorflow._api.v2.compat.v1 import ConfigProto
 # from tensorflow._api.v2.compat.v1 import InteractiveSession
 # from packaging import version
+
+from unet_sreeni import unet_sreeni
 
 def parse_args():
     # ---------------------------
@@ -133,7 +135,7 @@ def main():
 
     # setup model
     # Class includes loading dataset
-    specseg = SpecSeg( args )
+    # specseg = SpecSeg( args )
     # shmgan = ShmGAN_2input( args )
 
     # # build graph
@@ -141,7 +143,10 @@ def main():
 
     # train or test, as required
     if args.mode == 'train':
-        specseg.train( args )
+        # specseg.train( args )
+
+        unet_sreeni( args )
+
         print( " [*] Training finished!" )
     elif args.mode == 'test':
         specseg.test( args )
