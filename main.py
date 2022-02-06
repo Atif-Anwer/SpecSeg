@@ -34,6 +34,8 @@ from utils import check_gpu
 # from tensorflow._api.v2.compat.v1 import InteractiveSession
 # from packaging import version
 
+from unet_sreeni import unet_sreeni
+
 def parse_args():
     # ---------------------------
     # TODO: FIX ARGUMENTS; REMOVE UNNECESSARY ONES AND ADD RELEVANT ONES ONLY
@@ -141,7 +143,10 @@ def main():
 
     # train or test, as required
     if args.mode == 'train':
-        specseg.train( args )
+        # specseg.train( args )
+
+        unet_sreeni( args )
+
         print( " [*] Training finished!" )
     elif args.mode == 'test':
         specseg.test( args )
