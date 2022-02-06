@@ -64,8 +64,8 @@ def unet_sreeni( args ):
     # test_ids = next(os.walk(TEST_PATH))[1]
 
 
-    X_train = np.zeros((len(train_ids), IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS), dtype=np.uint8)
-    Y_train = np.zeros((len(train_ids), IMG_HEIGHT, IMG_WIDTH, 1), dtype=np.bool)
+    # X_train = np.zeros((len(train_ids), IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS), dtype=np.uint8)
+    # Y_train = np.zeros((len(train_ids), IMG_HEIGHT, IMG_WIDTH, 1), dtype=np.bool)
 
     print('Resizing training images and masks')
     # for n, id_ in tqdm(enumerate(train_ids), total=len(train_ids)):
@@ -99,7 +99,7 @@ def unet_sreeni( args ):
     # imshow(np.squeeze(Y_train[image_x]))
     # plt.show()
 
-    length_trainset, length_testset, rgb_train, masks_train, rgb_test = datasetLoad()
+    rgb_train, masks_train, rgb_test, train_batches, test_batches = datasetLoad()
 
     # plt.figure(figsize=(10, 10))
     # for images in rgb_train.take(1):
@@ -191,7 +191,15 @@ def unet_sreeni( args ):
 
     callbacks = [ tf.keras.callbacks.EarlyStopping(patience=2, monitor='val_loss')]
 
-    results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=16, epochs=25, callbacks=callbacks)
+    BATCH_SIZE = 32
+    STEPS_PER_EPOCH = 3017 // BATCH_SIZE
+
+    results = model.fit(train_batches, 
+                        epochs=10,
+                        steps_per_epoch=STEPS_PER_EPOCH,
+                        validation_data=test_batches,
+                        callbacks=callbacks)
+                        # validation_steps=VALIDATION_STEPS,
 
     ####################################
 
@@ -239,6 +247,7 @@ def datasetLoad( ):
 
     num_epochs = 20
     image_size = 128
+    batch_size = 32
 
     # NOTE:  => The generated datasets do not have any lables
 
@@ -248,15 +257,15 @@ def datasetLoad( ):
                 # label_mode       = 'categorical',
                 color_mode       = 'rgb',
                 # validation_split = 0.2,
-                # subset           = "training",
+                # subset           = "validation",
                 shuffle          = False,
                 seed             = 1337,
                 image_size       = (image_size, image_size),
-                batch_size       = 32
+                batch_size       = batch_size
             ) \
             .cache() \
-            .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
             .prefetch(25)
+            #.map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
             # .map(lambda x: x if random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
             # .map(lambda x: tf.image.per_image_standardization( x ) ) \
             # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
@@ -273,7 +282,7 @@ def datasetLoad( ):
                 shuffle          = False,
                 seed             = 1337,
                 image_size       = (image_size, image_size),
-                batch_size       = 32
+                batch_size       = batch_size
             ) \
             .cache() \
             .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
@@ -288,12 +297,12 @@ def datasetLoad( ):
                 labels           = None,
                 # label_mode       = 'categorical',
                 color_mode       = 'rgb',
-                validation_split = 0.2,
-                subset           = "validation",
+                # validation_split = 0.2,
+                # subset           = "validation",
                 shuffle          = False,
                 seed             = 1337,
                 image_size       = (image_size, image_size),
-                batch_size       = 32
+                batch_size       = batch_size
             ) \
             .cache() \
             .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
@@ -304,30 +313,48 @@ def datasetLoad( ):
     # Manually update the labels (?)
     rgb_test.class_names = 'RGB Validation'
 
-    # # ZIP the datasets into one dataset
-    # loadedDataset = tf.data.Dataset.zip ( ( rgb_train, masks_train ) )
-    # test_datset = tf.data.Dataset.zip ( val_images )
+    # return the number of files loaded , to calculate iterations per batch
+    # length_trainset = len(np.concatenate([i for i in rgb_train], axis=0))
+    # length_testset = len(np.concatenate([i for i in rgb_train], axis=0))
 
-    # dataset.map(time_consuming_mapping).cache().map(memory_consuming_mapping)
+    BATCH_SIZE = batch_size
+    BUFFER_SIZE = 1000
+    STEPS_PER_EPOCH = 3017 // BATCH_SIZE
 
-    # Sauce: https://www.tensorflow.org/guide/data_performance_analysis#3_are_you_reaching_high_cpu_utilization
-    # options = tf.data.Options()
-    # options.experimental_threading.max_intra_op_parallelism = 1
-    # loadedDataset = loadedDataset.with_options(options)
+    train_batches = (
+    rgb_train
+    .cache()
+    .shuffle(BUFFER_SIZE)
+    .batch(BATCH_SIZE)
+    .repeat()
+    .prefetch(buffer_size=tf.data.AUTOTUNE))
+    # .map(Augment())
 
+    test_batches = rgb_test.batch(BATCH_SIZE)
 
-    # -------------------------------------------------------
-    # Repeat/parse the loaded dataset for the same number as epochs...
-    # cahces and prefetches the datasets for performance
-    # repeat for epochs
+    # for images, masks in train_batches.take(2):
+    #     sample_image, sample_mask = images[0], masks[0]
+    #     display([sample_image, sample_mask])
+
     # TODO: Check for performance
     rgb_train = rgb_train.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
     masks_train = masks_train.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
     rgb_test = rgb_test.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
     # -------------------------------------------------------
 
-    # return the number of files loaded , to calculate iterations per batch
-    length_trainset = len(np.concatenate([i for i in rgb_train], axis=0))
-    length_testset = len(np.concatenate([i for i in rgb_train], axis=0))
+
     # returns the zipped dataset for use with iterator
-    return length_trainset, length_testset, rgb_train, masks_train, rgb_test
+    return rgb_train, masks_train, rgb_test, train_batches, test_batches
+
+
+def display(display_list):
+    plt.figure(figsize=(15, 15))
+
+    title = ['Input Image', 'True Mask', 'Predicted Mask']
+
+    for i in range(len(display_list)):
+        plt.subplot(1, len(display_list), i+1)
+        plt.title(title[i])
+        plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
+        plt.axis('off')
+    plt.show()
