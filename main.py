@@ -24,7 +24,7 @@ import tensorflow as tf
 # import io
 import matplotlib.pyplot as plt
 import numpy as np
-from SpecSeg import SpecSeg
+# from SpecSeg import SpecSeg
 # from ShmGAN_2input import ShmGAN_2input
 from datetime import datetime
 from tensorflow import keras
@@ -135,7 +135,7 @@ def main():
 
     # setup model
     # Class includes loading dataset
-    specseg = SpecSeg( args )
+    # specseg = SpecSeg( args )
     # shmgan = ShmGAN_2input( args )
 
     # # build graph

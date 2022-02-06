@@ -21,7 +21,14 @@ from matplotlib import cm, pyplot as plt
 from packaging import version
 from tensorflow.keras import mixed_precision
 import random
-
+from tensorflow.python.ops.init_ops_v2 import Initializer
+import tensorflow as tf
+import tensorflow_addons as tfa
+import tensorflow_probability as tfp
+import time
+import datetime
+import pathlib
+import gc
 from tqdm import tqdm
 
 from datetime import datetime
@@ -61,17 +68,17 @@ def unet_sreeni( args ):
     Y_train = np.zeros((len(train_ids), IMG_HEIGHT, IMG_WIDTH, 1), dtype=np.bool)
 
     print('Resizing training images and masks')
-    for n, id_ in tqdm(enumerate(train_ids), total=len(train_ids)):
-        path = TRAIN_PATH
-        img = imread(path +'HighlightImages/'+ id_)[:,:,:3]
-        img = resize(img, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
-        X_train[n] = img  #Fill empty X_train with values from img
-        mask = np.zeros((IMG_HEIGHT, IMG_WIDTH, 1), dtype=np.bool)
+    # for n, id_ in tqdm(enumerate(train_ids), total=len(train_ids)):
+    #     path = TRAIN_PATH
+    #     img = imread(path +'HighlightImages/'+ id_)[:,:,:3]
+    #     img = resize(img, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
+    #     X_train[n] = img  #Fill empty X_train with values from img
+    #     mask = np.zeros((IMG_HEIGHT, IMG_WIDTH, 1), dtype=np.bool)
 
-        mask = rgb2gray(imread(path +'HighlightMasks/'+ id_))
-        mask = np.expand_dims(resize(mask, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True), axis=2)
+    #     mask = rgb2gray(imread(path +'HighlightMasks/'+ id_))
+    #     mask = np.expand_dims(resize(mask, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True), axis=2)
 
-        Y_train[n] = mask
+    #     Y_train[n] = mask
 
     # test images
     # X_test = np.zeros((len(test_ids), IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS), dtype=np.uint8)
@@ -86,14 +93,37 @@ def unet_sreeni( args ):
 
     # print('Done!')
 
-    image_x = random.randint(0, len(train_ids))
-    imshow(X_train[image_x])
-    plt.show()
-    imshow(np.squeeze(Y_train[image_x]))
-    plt.show()
+    # image_x = random.randint(0, len(train_ids))
+    # imshow(X_train[image_x])
+    # plt.show()
+    # imshow(np.squeeze(Y_train[image_x]))
+    # plt.show()
 
+    length_trainset, length_testset, rgb_train, masks_train, rgb_test = datasetLoad()
 
+    # plt.figure(figsize=(10, 10))
+    # for images in rgb_train.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("float32"))
+    #         # plt.title(i)
+    #         plt.axis("off")
 
+    # plt.figure(figsize=(10, 10))
+    # for images in masks_train.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         # plt.title(i)
+    #         plt.axis("off")
+
+    # plt.figure(figsize=(10, 10))
+    # for images in rgb_test.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("float32"))
+    #         # plt.title(i)
+    #         plt.axis("off")
 
     #Build the model
     inputs = tf.keras.layers.Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
@@ -157,11 +187,9 @@ def unet_sreeni( args ):
 
     ################################
     #Modelcheckpoint
-    checkpointer = tf.keras.callbacks.ModelCheckpoint('model_for_nuclei.h5', verbose=1, save_best_only=True)
+    checkpointer = tf.keras.callbacks.ModelCheckpoint('SpecSeg.h5', verbose=1, save_best_only=True)
 
-    callbacks = [
-            tf.keras.callbacks.EarlyStopping(patience=2, monitor='val_loss'),
-            tf.keras.callbacks.TensorBoard(log_dir='logs')]
+    callbacks = [ tf.keras.callbacks.EarlyStopping(patience=2, monitor='val_loss')]
 
     results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=16, epochs=25, callbacks=callbacks)
 
@@ -172,12 +200,12 @@ def unet_sreeni( args ):
 
     preds_train = model.predict(X_train[:int(X_train.shape[0]*0.9)], verbose=1)
     preds_val = model.predict(X_train[int(X_train.shape[0]*0.9):], verbose=1)
-    preds_test = model.predict(X_test, verbose=1)
+    # preds_test = model.predict(X_test, verbose=1)
 
 
     preds_train_t = (preds_train > 0.5).astype(np.uint8)
     preds_val_t = (preds_val > 0.5).astype(np.uint8)
-    preds_test_t = (preds_test > 0.5).astype(np.uint8)
+    # preds_test_t = (preds_test > 0.5).astype(np.uint8)
 
 
     # Perform a sanity check on some random training samples
@@ -197,3 +225,109 @@ def unet_sreeni( args ):
     plt.show()
     imshow(np.squeeze(preds_val_t[ix]))
     plt.show()
+
+
+
+def datasetLoad( ):
+
+    trainfolder = '/home/atif/Documents/Datasets/WHU-specular-dataset/train/'
+    testfolder  = '/home/atif/Documents/Datasets/WHU-specular-dataset/test/'
+    # FOR SHMGAN Dataset
+    train_images = pathlib.Path( os.path.join( trainfolder, 'HighlightImages' ) )
+    train_masks  = pathlib.Path( os.path.join( trainfolder, 'HighlightMasks' ) )
+    test_images  = pathlib.Path( os.path.join( testfolder, 'HighlightImages' ) )
+
+    num_epochs = 20
+    image_size = 128
+
+    # NOTE:  => The generated datasets do not have any lables
+
+    rgb_train = tf.keras.preprocessing.image_dataset_from_directory(
+            str( train_images ),
+                labels           = None,
+                # label_mode       = 'categorical',
+                color_mode       = 'rgb',
+                # validation_split = 0.2,
+                # subset           = "training",
+                shuffle          = False,
+                seed             = 1337,
+                image_size       = (image_size, image_size),
+                batch_size       = 32
+            ) \
+            .cache() \
+            .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+            .prefetch(25)
+            # .map(lambda x: x if random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+            # .map(lambda x: tf.image.per_image_standardization( x ) ) \
+            # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
+    # Manually update the labels (?)
+    rgb_train.class_names = 'RGB'
+
+    masks_train = tf.keras.preprocessing.image_dataset_from_directory(
+            str( train_masks ),
+                labels           = None,
+                # label_mode       = 'categorical',
+                color_mode       = 'grayscale',
+                # validation_split = 0.2,
+                # subset           = "training",
+                shuffle          = False,
+                seed             = 1337,
+                image_size       = (image_size, image_size),
+                batch_size       = 32
+            ) \
+            .cache() \
+            .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+            .prefetch(25)
+            # .map(lambda x: x if random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+            # .map(lambda x: tf.image.per_image_standardization( x ) ) \
+            # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
+    masks_train.class_names = 'MASK'
+
+    rgb_test = tf.keras.preprocessing.image_dataset_from_directory(
+            str( test_images ),
+                labels           = None,
+                # label_mode       = 'categorical',
+                color_mode       = 'rgb',
+                validation_split = 0.2,
+                subset           = "validation",
+                shuffle          = False,
+                seed             = 1337,
+                image_size       = (image_size, image_size),
+                batch_size       = 32
+            ) \
+            .cache() \
+            .map(lambda x: (x / 255.0), num_parallel_calls=tf.data.AUTOTUNE  ) \
+            .prefetch(25)
+            # .map(lambda x: x if random_flip else tf.image.flip_up_down( x ), num_parallel_calls=tf.data.AUTOTUNE) \
+            # .map(lambda x: tf.image.per_image_standardization( x ) ) \
+            # .map(lambda x: ((x / 127.5) - 1 ), num_parallel_calls=tf.data.AUTOTUNE  ) \
+    # Manually update the labels (?)
+    rgb_test.class_names = 'RGB Validation'
+
+    # # ZIP the datasets into one dataset
+    # loadedDataset = tf.data.Dataset.zip ( ( rgb_train, masks_train ) )
+    # test_datset = tf.data.Dataset.zip ( val_images )
+
+    # dataset.map(time_consuming_mapping).cache().map(memory_consuming_mapping)
+
+    # Sauce: https://www.tensorflow.org/guide/data_performance_analysis#3_are_you_reaching_high_cpu_utilization
+    # options = tf.data.Options()
+    # options.experimental_threading.max_intra_op_parallelism = 1
+    # loadedDataset = loadedDataset.with_options(options)
+
+
+    # -------------------------------------------------------
+    # Repeat/parse the loaded dataset for the same number as epochs...
+    # cahces and prefetches the datasets for performance
+    # repeat for epochs
+    # TODO: Check for performance
+    rgb_train = rgb_train.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
+    masks_train = masks_train.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
+    rgb_test = rgb_test.cache().repeat( num_epochs ).prefetch( buffer_size = 32)
+    # -------------------------------------------------------
+
+    # return the number of files loaded , to calculate iterations per batch
+    length_trainset = len(np.concatenate([i for i in rgb_train], axis=0))
+    length_testset = len(np.concatenate([i for i in rgb_train], axis=0))
+    # returns the zipped dataset for use with iterator
+    return length_trainset, length_testset, rgb_train, masks_train, rgb_test
