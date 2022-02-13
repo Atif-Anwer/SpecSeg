@@ -18,32 +18,32 @@ def simple_unet_model(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS):
     #Contraction path
     c1 = Conv2D(16, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(s)
     c1 = Dropout(0.1)(c1)
-    c1 = Conv2D(16, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c1)
     c1 = BatchNormalization(axis=-1)(c1)
+    c1 = Conv2D(16, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c1)
     p1 = MaxPooling2D((2, 2))(c1)
 
     c2 = Conv2D(32, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(p1)
     c2 = Dropout(0.1)(c2)
-    c2 = Conv2D(32, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c2)
     c2 = BatchNormalization(axis=-1)(c2)
+    c2 = Conv2D(32, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c2)
     p2 = MaxPooling2D((2, 2))(c2)
 
     c3 = Conv2D(64, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(p2)
     c3 = Dropout(0.2)(c3)
-    c3 = Conv2D(64, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c3)
     c3 = BatchNormalization(axis=-1)(c3)
+    c3 = Conv2D(64, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c3)
     p3 = MaxPooling2D((2, 2))(c3)
 
     c4 = Conv2D(128, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(p3)
     c4 = Dropout(0.2)(c4)
-    c4 = Conv2D(128, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c4)
     c4 = BatchNormalization(axis=-1)(c4)
+    c4 = Conv2D(128, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c4)
     p4 = MaxPooling2D(pool_size=(2, 2))(c4)
 
     c5 = Conv2D(256, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(p4)
     c5 = Dropout(0.3)(c5)
-    c5 = Conv2D(256, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c5)
     c5 = BatchNormalization(axis=-1)(c5)
+    c5 = Conv2D(256, (3, 3), activation='relu', kernel_initializer='RandomNormal', padding='same')(c5)
 
     #Expansive path
     u6 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(c5)
@@ -81,7 +81,7 @@ def simple_unet_model(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS):
     metrics = [sm.metrics.IOUScore(threshold=0.5), sm.metrics.FScore(threshold=0.5)]
 
     # model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    model.compile(optimizer='adam', loss=total_loss, metrics=metrics)
+    model.compile(optimizer='adam', loss=total_loss, metrics='SparseCategoricalCrossentropy')
     model.summary()
 
     return model
