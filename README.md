@@ -39,6 +39,8 @@ ISSN           = {1424-8220},
 DOI            = {10.3390/s22176552}
 }
 ```
+### The <a href="#readme-top">Article PDF </a> is open access and can be downloaded directly from MDPI.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -58,7 +60,7 @@ This repository is the implementation of our paper 'SpecSeg Network for Specular
 </div>
 
 ## Requirements
-- Tested with Python 3.7, Tensorflow 2.5+ on local GPU
+- Tested with Python 3.7, Tensorflow 2.5+ on local GPU (CUDA 11.3)
 - Tested with Python 3.7, Tensorflow 2.8+ on Google Colab
 - Uses the <a href="https://github.com/qubvel/segmentation_models">Segmentation Models </a> library
 
