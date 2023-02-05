@@ -1,0 +1,52 @@
+#  for multiple files (To test)
+# defaults:
+#   - mmpose: config
+
+files:
+  # Directories.
+  test_video_path  : /home/atif/Documents/Datasets/Apeira/New_Data/${files.test_video_folder}
+
+  model_save_dir: ./
+  train_dir     : /home/atif/Documents/Datasets/WHU-specular-dataset/train
+  test_dir      : /home/atif/Documents/Datasets/WHU-specular-dataset/test
+  test_img_dir  : ${files.test_dir}/HighlightImages/
+  test_mask_dir : ${files.test_dir}/HighlightMasks/
+  result_dir    : ./results
+  log_dir       : ./logs/
+
+params:
+  # image_size  : image_size  # the size of the image after resizing
+  IMG_HEIGHT  : 256
+  IMG_WIDTH   : 256
+  IMG_CHANNELS: 1
+
+  # Training configuration.
+  # num_epochs         : num_epochs
+  # num_iteration_decay: num_iteration_decay
+  # beta1              : beta1
+  # beta2              : beta2
+
+  # Misc parameters
+  seed         : 25
+  randomness   : 0.50
+
+  # Flags
+  mode                  : test           # choices = ['train', 'test', 'custom'
+  flip                  : True
+  calc_metrics          : False
+  delete_old_checkpoints: True
+
+  image_size          : 128
+  batch_size          : 1
+  num_epochs          : 500
+  n_critic            : 5
+  log_step            : 1
+  checkpoint_save_step: 10
+
+  # Model parameters
+  filter_size: 64
+  beta1      : 0.5
+  beta2      : 0.99
+
+  # load using TF dataset loader or directly into RAM
+  dataset_load: RAM   # choices = ["RAM", "TF_Load", "VIDEO"]
