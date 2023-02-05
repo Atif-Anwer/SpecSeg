@@ -20,6 +20,8 @@ params:
   IMG_WIDTH   : 256
   IMG_CHANNELS: 1
 
+  patch_size  : ${params.IMG_HEIGHT}
+
   # Training configuration.
   # num_epochs         : num_epochs
   # num_iteration_decay: num_iteration_decay

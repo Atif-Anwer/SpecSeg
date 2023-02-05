@@ -207,18 +207,18 @@ def SpecSegv2( cfg: DictConfig ) -> None:
     # Make the iterator from the zipped datasets
     iterator = (zip(image_dataset, mask_dataset))
 
-    # ---- To check if data loaded correctly ----
-    image_number = random.randint(0, len(image_dataset))
-    plt.figure(figsize=(12, 6))
-    plt.subplot(121)
-    # plt.imshow(np.reshape(X_train[image_number], (SIZE, SIZE)), cmap='gray')
-    plt.imshow(image_dataset[image_number])
-    plt.axis('off')
-    plt.subplot(122)
-    # plt.imshow(np.reshape(y_train[image_number], (SIZE, SIZE)), cmap='gray')
-    plt.imshow(mask_dataset[image_number], cmap='gray')
-    plt.axis('off')
-    plt.show()
+    # # ---- To check if data loaded correctly ----
+    # image_number = random.randint(0, len(image_dataset))
+    # plt.figure(figsize=(12, 6))
+    # plt.subplot(121)
+    # # plt.imshow(np.reshape(X_train[image_number], (SIZE, SIZE)), cmap='gray')
+    # plt.imshow(image_dataset[image_number])
+    # plt.axis('off')
+    # plt.subplot(122)
+    # # plt.imshow(np.reshape(y_train[image_number], (SIZE, SIZE)), cmap='gray')
+    # plt.imshow(mask_dataset[image_number], cmap='gray')
+    # plt.axis('off')
+    # plt.show()
 
     # # Get the next set of images
     # element = next(iterator)
@@ -232,34 +232,40 @@ def SpecSegv2( cfg: DictConfig ) -> None:
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(16,32))
     fig.tight_layout()
     for i in range(num_images):
+
         test_img_number = i
-        test_img = image_dataset[test_img_number]
-        test_img_norm=test_img[:,:,0][:,:,None]
-        test_img_input=np.expand_dims(test_img_norm, 0)
-        prediction = (model.predict(test_img_input)[0,:,:,0] )
+        test_img = cv2.cvtColor(image_dataset[test_img_number], cv2.COLOR_RGB2GRAY)
+
+
+        segmented_image = predict_patches(model, test_img, cfg.params.patch_size)
+        # plt.hist(segmented_image.flatten())  #Threshold everything above 0
+
+        # test_img_norm=test_img[:,:,0][:,:,None]
+        # test_img_input=np.expand_dims(test_img_norm, 0)
+        # prediction = (model.predict(test_img_input)[0,:,:,0] )
         # --------------TEST IMAGE-----------------
         plt.subplot(num_images,3,index+1)
         plt.title('Test Image')
         plt.axis('off')
-        plt.imshow(test_img[:,:,0], cmap='gray')
-        name="./results_randomTestImages/img_" + str(i) + '.png'
-        plt.imsave(name, test_img[:,:,0], cmap='gray')
+        plt.imshow(image_dataset[test_img_number])
+        # name="./results_randomTestImages/img_" + str(i) + '.png'
+        # plt.imsave(name, test_img[:,:,0], cmap='gray')
 
         # --------------GT -----------------
         ground_truth=mask_dataset[test_img_number]
         plt.subplot(num_images,3,index+2)
         plt.title('Ground Truth')
         plt.axis('off')
-        plt.imshow(ground_truth[:,:,0], cmap='gray')
-        name="./results/gt" + str(i) + '.png'
+        plt.imshow(ground_truth, cmap='gray')
+        # name="./results/gt" + str(i) + '.png'
 
         # --------------PREDICTION-----------------
         plt.subplot(num_images,3,index+3)
         plt.title('Predicted Specular Highlights')
         plt.axis('off')
-        plt.imshow(prediction, cmap='gray')
-        name="./results_randomTestImages/prediction_" + str(i) + '.png'
-        plt.imsave(name, prediction, cmap='gray')
+        plt.imshow(segmented_image, cmap='gray')
+        # name="./results_randomTestImages/prediction_" + str(i) + '.png'
+        # plt.imsave(name, prediction, cmap='gray')
 
         index = 3 * (i+1)
 
@@ -269,6 +275,46 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
     return
 
+
+def predict_patches (model, image, patch_size):
+    """
+    Predict a large image by patching it into 256x256 images
+    """
+
+    # If the image is smaller than 256x256, resize it first to adapt to SpecSeg
+    if np.shape(image)[0] < 256 or np.shape(image)[1] < 256:
+                    image = cv2.resize(image, (256, 256))
+
+    segm_img = np.zeros(image.shape[:2])  #Array with zeros to be filled with segmented values
+    patch_num=1
+    filled_patch = False
+    for i in range(0, image.shape[0], 256):   #Steps of 256
+        for j in range(0, image.shape[1], 256):  #Steps of 256
+            #print(i, j)
+            single_patch = image[i:i+patch_size, j:j+patch_size]
+            if np.shape(single_patch)[0] != np.shape(single_patch)[1]:
+                # Reshape the patch and fill with 0 if the patches are at the corner
+                filled_patch = True
+                dim1 = np.shape(single_patch)[0]
+                dim2 = np.shape(single_patch)[1]
+                single_patch = np.pad(single_patch, [(256-dim1, 0), (0,256-dim2)], mode='constant', constant_values=(0,0))
+            single_patch_norm = np.expand_dims(normalize(np.array(single_patch), axis=1),2)
+            single_patch_shape = single_patch_norm.shape[:2]
+            single_patch_input = np.expand_dims(single_patch_norm, 0)
+            single_patch_prediction = (model.predict(single_patch_input)[0,:,:,0] > 0.5).astype(np.uint8)
+            if filled_patch == True:
+                # Crop the predicted image back to the original size
+                single_patch_prediction = single_patch_prediction[0:dim1, 0:dim2]
+                # reset the flag for the next patches
+                filled_patch = False
+                single_patch_shape = (dim1, dim2)
+                segm_img[i:i+dim1, j:j+dim2] += cv2.resize(single_patch_prediction, single_patch_shape[::-1])
+            else:
+                segm_img[i:i+single_patch_shape[0], j:j+single_patch_shape[1]] += cv2.resize(single_patch_prediction, single_patch_shape[::-1])
+
+            print(f"Finished processing patch number {patch_num} at position {i},{j}")
+            patch_num+=1
+    return segm_img
 
 # ------------------------------------------------
 #
@@ -435,7 +481,6 @@ def datasetload_ram( cfg: DictConfig ):
 
     # return X_train, y_train, X_test, Y_test
     return image_dataset, mask_dataset
-
 
 
 # ------------------------------------------------
