@@ -74,6 +74,17 @@ logging.basicConfig(level=logging.INFO,
 
 
 
+# Decorrator for timing a function
+# Ref: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
+def _time(f):
+    def wrapper (*args):
+        start = time.time()
+        r = f(*args)
+        end = time.time()
+        print ("%s timed %f" % (f.__name__, end-start) )
+        return r
+    return wrapper
+
 
 # ------------------------------------------------
 #
@@ -275,7 +286,7 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
     return
 
-
+@_time
 def predict_patches (model, image, patch_size):
     """
     Predict a large image by patching it into 256x256 images
@@ -432,6 +443,7 @@ def datasetLoad_tf( ):
     # returns the zipped dataset for use with iterator
     return length_dataset, loadedDataset
 
+@_time
 def datasetload_ram( cfg: DictConfig ):
     """
     # --------------------------------------------------------------
