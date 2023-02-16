@@ -238,11 +238,14 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
     # ---- Test on Random images ----
     # Enter number of images to test on
-    num_images = 5
+    num_images = 10
+    # The starting index number from the images loaded
+    start = 20
     index = 0
+    img_no = 0
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(16,32))
     fig.tight_layout()
-    for i in range(num_images):
+    for i in range(start, start+num_images):
 
         test_img_number = i
         test_img = cv2.cvtColor(image_dataset[test_img_number], cv2.COLOR_RGB2GRAY)
@@ -278,7 +281,8 @@ def SpecSegv2( cfg: DictConfig ) -> None:
         # name="./results_randomTestImages/prediction_" + str(i) + '.png'
         # plt.imsave(name, prediction, cmap='gray')
 
-        index = 3 * (i+1)
+        index = 3 * (img_no+1)
+        img_no += 1
 
     # plt.imsave('/results/output2.jpg', fig)
     fig.savefig('randomTestImages-random.png')   # save the figure to file
@@ -303,7 +307,7 @@ def predict_patches (model, image, patch_size):
         for j in range(0, image.shape[1], 256):  #Steps of 256
             #print(i, j)
             single_patch = image[i:i+patch_size, j:j+patch_size]
-            if np.shape(single_patch)[0] != np.shape(single_patch)[1]:
+            if np.shape(single_patch)[0] <256 or np.shape(single_patch)[1] <256:
                 # Reshape the patch and fill with 0 if the patches are at the corner
                 filled_patch = True
                 dim1 = np.shape(single_patch)[0]
@@ -323,7 +327,7 @@ def predict_patches (model, image, patch_size):
             else:
                 segm_img[i:i+single_patch_shape[0], j:j+single_patch_shape[1]] += cv2.resize(single_patch_prediction, single_patch_shape[::-1])
 
-            print(f"Finished processing patch number {patch_num} at position {i},{j}")
+            # print(f"Finished processing patch number {patch_num} at position {i},{j}")
             patch_num+=1
     return segm_img
 
