@@ -1,6 +1,5 @@
 #  for multiple files (To test)
-# defaults:
-#   - mmpose: config
+# python ./src/SpecSegv2.py --multirun 'params.dataset_load=RGB_RAM, RESIZED_RAM'
 
 files:
   # Directories.
@@ -51,4 +50,4 @@ params:
   beta2      : 0.99
 
   # load using TF dataset loader or directly into RAM
-  dataset_load: RAM   # choices = ["RAM", "TF_Load", "VIDEO"]
+  dataset_load: RGB_RAM   # choices = ["RGB_RAM", "TF_Load", "RESIZED_RAM", "VIDEO"]

@@ -205,42 +205,28 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
 
     # ---- Load SpecSeg Model ----
-    model = specseg(cfg.params.IMG_HEIGHT, cfg.params.IMG_WIDTH, cfg.params.IMG_CHANNELS)
+    # model = specseg(cfg.params.IMG_HEIGHT, cfg.params.IMG_WIDTH, cfg.params.IMG_CHANNELS)
+    model = specseg(None, None, cfg.params.IMG_CHANNELS)
+
     model.load_weights('SpecSeg_weights.hdf5') #Trained for 50 epochs and then additional 100
 
     # ---- Load Dataset in eithre RAM or as TF dataset ----
     # Load dataset using the Tensorflow dataset loader or directly into RAM
     if cfg.params.dataset_load == "TFLoader":
         length_dataset, Dataset, test_datset = datasetLoad_tf( cfg )
-    elif cfg.params.dataset_load == "RAM":
+    elif cfg.params.dataset_load == "RGB_RAM":
         image_dataset, mask_dataset = datasetload_ram( cfg )
+    elif cfg.params.dataset_load == "RESIZED_RAM":
+        image_dataset, mask_dataset = datasetload_ram_resized( cfg )
 
     # Make the iterator from the zipped datasets
     iterator = (zip(image_dataset, mask_dataset))
-
-    # # ---- To check if data loaded correctly ----
-    # image_number = random.randint(0, len(image_dataset))
-    # plt.figure(figsize=(12, 6))
-    # plt.subplot(121)
-    # # plt.imshow(np.reshape(X_train[image_number], (SIZE, SIZE)), cmap='gray')
-    # plt.imshow(image_dataset[image_number])
-    # plt.axis('off')
-    # plt.subplot(122)
-    # # plt.imshow(np.reshape(y_train[image_number], (SIZE, SIZE)), cmap='gray')
-    # plt.imshow(mask_dataset[image_number], cmap='gray')
-    # plt.axis('off')
-    # plt.show()
-
-    # # Get the next set of images
-    # element = next(iterator)
-    # # orig0   = element[0]
-    # # orig45  = element[1]
 
     # ---- Test on Random images ----
     # Enter number of images to test on
     num_images = 10
     # The starting index number from the images loaded
-    start = 20
+    start = 25
     index = 0
     img_no = 0
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(16,32))
@@ -248,15 +234,19 @@ def SpecSegv2( cfg: DictConfig ) -> None:
     for i in tqdm(range(start, start+num_images), desc='Testing Image #', unit=' images'):
 
         test_img_number = i
-        test_img = cv2.cvtColor(image_dataset[test_img_number], cv2.COLOR_RGB2GRAY)
 
+        if cfg.params.dataset_load == 'RGB_RAM':
+            """ For testing Original RGB images """
+            test_img = cv2.cvtColor(image_dataset[test_img_number], cv2.COLOR_RGB2GRAY)
+            segmented_image = predict_patches(model, test_img, cfg.params.patch_size)
 
-        segmented_image = predict_patches(model, test_img, cfg.params.patch_size)
-        # plt.hist(segmented_image.flatten())  #Threshold everything above 0
+        elif cfg.params.dataset_load == 'RESIZED_RAM':
+            """ For testing resized images """
+            test_img = image_dataset[test_img_number]
+            test_img_norm=test_img[:,:,0][:,:,None]
+            test_img_input=np.expand_dims(test_img_norm, 0)
+            segmented_image = (model.predict(test_img_input)[0,:,:,0] )
 
-        # test_img_norm=test_img[:,:,0][:,:,None]
-        # test_img_input=np.expand_dims(test_img_norm, 0)
-        # prediction = (model.predict(test_img_input)[0,:,:,0] )
         # --------------TEST IMAGE-----------------
         plt.subplot(num_images,3,index+1)
         plt.title('Test Image')
@@ -467,6 +457,8 @@ def datasetload_ram( cfg: DictConfig ):
         if (image_name.split('.')[1] == 'png'):
             # Loading images as RGB
             image = cv2.cvtColor( cv2.imread(image_directory+image_name), cv2.COLOR_BGR2RGB)
+            # Load image as Grayscale
+            # image = cv2.imread(image_directory+image_name, 0)
             image = Image.fromarray(image)
             # image = image.resize( (SIZE, SIZE) )
             # q = np.array(image)
@@ -498,6 +490,58 @@ def datasetload_ram( cfg: DictConfig ):
     # return X_train, y_train, X_test, Y_test
     return image_dataset, mask_dataset
 
+@_time
+def datasetload_ram_resized( cfg: DictConfig ):
+    """
+    # --------------------------------------------------------------
+    #                       LOAD IMAGES IN RAM                     |
+    # --------------------------------------------------------------
+    """
+    image_directory = cfg.files.test_img_dir
+    mask_directory  = cfg.files.test_mask_dir
+
+    SIZE = 256
+    image_dataset = []  #Many ways to handle data, you can use pandas. Here, we are using a list format.
+    mask_dataset = []  #Place holders to define add labels. We will add 0 to all parasitized images and 1 to uninfected.
+
+    logging.info("Loading Test images")
+    images = natsorted(os.listdir(image_directory))
+    for i, image_name in enumerate(tqdm(images, desc='Test Images', unit=' images')):    #Remember enumerate method adds a counter and returns the enumerate object
+        if (image_name.split('.')[1] == 'png'):
+            # Loading images as RGB
+            # image = cv2.cvtColor( cv2.imread(image_directory+image_name), cv2.COLOR_BGR2RGB)
+            # Load image as Grayscale
+            image = cv2.imread(image_directory+image_name, 0)
+            image = Image.fromarray(image)
+            image = image.resize( (SIZE, SIZE) )
+            # q = np.array(image)
+            image_dataset.append( np.array(image) )
+
+    logging.info("Loading Test Masks")
+    masks = natsorted(os.listdir(mask_directory))
+    for i, image_name in enumerate(tqdm(masks, desc='Test Masks', unit=' images')):
+        if (image_name.split('.')[1] == 'png'):
+            # Loading images as GREYSCALE mode
+            image = cv2.imread(mask_directory+image_name, 0)
+            image = Image.fromarray(image)
+            image = image.resize( (SIZE, SIZE) )
+            mask_dataset.append( np.array(image) )
+
+    #Normalize images
+    image_dataset = np.expand_dims(normalize(np.array(image_dataset), axis=1),3)
+    #D not normalize masks, just rescale to 0 to 1.
+    # mask_dataset = np.expand_dims((np.array(mask_dataset)),3) /255.
+    mask_dataset = np.array( mask_dataset )/255.0
+
+
+    # X_train, X_test, y_train, Y_test = train_test_split(image_dataset, mask_dataset, test_size = 0.10, random_state = 0)
+
+    # cfg.IMG_HEIGHT = image_dataset.shape[1]
+    # cfg.IMG_WIDTH  = image_dataset.shape[2]
+    # cfg.IMG_CHANNELS = image_dataset.shape[3]
+
+    # return X_train, y_train, X_test, Y_test
+    return image_dataset, mask_dataset
 
 # ------------------------------------------------
 #               __  .__   __.  __  .___________.
