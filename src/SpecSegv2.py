@@ -275,7 +275,8 @@ def SpecSegv2( cfg: DictConfig ) -> None:
         img_no += 1
 
     # plt.imsave('/results/output2.jpg', fig)
-    fig.savefig('randomTestImages-random.png')   # save the figure to file
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    fig.savefig('randomTestImages'+timestr+'-random.png')   # save the figure to file
     print ("Done and Done!")
 
     return
