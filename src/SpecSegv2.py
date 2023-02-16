@@ -81,7 +81,7 @@ def _time(f):
         start = time.time()
         r = f(*args)
         end = time.time()
-        print ("%s timed %f" % (f.__name__, end-start) )
+        tqdm.write ("%s timed %f" % (f.__name__, end-start) )
         return r
     return wrapper
 
@@ -245,7 +245,7 @@ def SpecSegv2( cfg: DictConfig ) -> None:
     img_no = 0
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(16,32))
     fig.tight_layout()
-    for i in range(start, start+num_images):
+    for i in tqdm(range(start, start+num_images), desc='Testing Image #', unit=' images'):
 
         test_img_number = i
         test_img = cv2.cvtColor(image_dataset[test_img_number], cv2.COLOR_RGB2GRAY)
@@ -463,7 +463,7 @@ def datasetload_ram( cfg: DictConfig ):
 
     logging.info("Loading Test images")
     images = natsorted(os.listdir(image_directory))
-    for i, image_name in enumerate(images):    #Remember enumerate method adds a counter and returns the enumerate object
+    for i, image_name in enumerate(tqdm(images, desc='Test Images', unit=' images')):    #Remember enumerate method adds a counter and returns the enumerate object
         if (image_name.split('.')[1] == 'png'):
             # Loading images as RGB
             image = cv2.cvtColor( cv2.imread(image_directory+image_name), cv2.COLOR_BGR2RGB)
@@ -474,7 +474,7 @@ def datasetload_ram( cfg: DictConfig ):
 
     logging.info("Loading Test Masks")
     masks = natsorted(os.listdir(mask_directory))
-    for i, image_name in enumerate(masks):
+    for i, image_name in enumerate(tqdm(masks, desc='Test Masks', unit=' images')):
         if (image_name.split('.')[1] == 'png'):
             # Loading images as GREYSCALE mode
             image = cv2.imread(mask_directory+image_name, 0)
