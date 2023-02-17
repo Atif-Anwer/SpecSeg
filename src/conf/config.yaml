@@ -1,5 +1,6 @@
 #  for multiple files (To test)
 # python ./src/SpecSegv2.py --multirun 'params.dataset_load=RGB_RAM, RESIZED_RAM'
+# python ./src/SpecSegv2.py --multirun 'params.patch_size=128, 256, 512, 1024'
 
 files:
   # Directories.

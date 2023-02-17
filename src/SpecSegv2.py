@@ -224,9 +224,9 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
     # ---- Test on Random images ----
     # Enter number of images to test on
-    num_images = 10
+    num_images = 5
     # The starting index number from the images loaded
-    start = 25
+    start = 5
     index = 0
     img_no = 0
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(16,32))
@@ -276,7 +276,7 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 
     # plt.imsave('/results/output2.jpg', fig)
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    fig.savefig('randomTestImages'+timestr+'-random.png')   # save the figure to file
+    fig.savefig('./results/randomTestImages'+timestr+'-random.png')   # save the figure to file
     print ("Done and Done!")
 
     return
@@ -284,35 +284,36 @@ def SpecSegv2( cfg: DictConfig ) -> None:
 @_time
 def predict_patches (model, image, patch_size):
     """
-    Predict a large image by patching it into 256x256 images
+    Predict a large image by patching it into (patch size x pathc size) images
     """
 
     # If the image is smaller than 256x256, resize it first to adapt to SpecSeg
-    if np.shape(image)[0] < 256 or np.shape(image)[1] < 256:
-                    image = cv2.resize(image, (256, 256))
+    if np.shape(image)[0] < patch_size or np.shape(image)[1] < patch_size:
+                    image = cv2.resize(image, (patch_size, patch_size))
 
     segm_img = np.zeros(image.shape[:2])  #Array with zeros to be filled with segmented values
     patch_num=1
-    filled_patch = False
-    for i in range(0, image.shape[0], 256):   #Steps of 256
-        for j in range(0, image.shape[1], 256):  #Steps of 256
+    padded_patch = False
+    for i in range(0, image.shape[0], patch_size):   #Steps of patch_size
+        for j in range(0, image.shape[1], patch_size):  #Steps of patch_size
             #print(i, j)
             single_patch = image[i:i+patch_size, j:j+patch_size]
-            if np.shape(single_patch)[0] <256 or np.shape(single_patch)[1] <256:
+            if np.shape(single_patch)[0] <patch_size or np.shape(single_patch)[1] <patch_size:
                 # Reshape the patch and fill with 0 if the patches are at the corner
-                filled_patch = True
+                padded_patch = True
                 dim1 = np.shape(single_patch)[0]
                 dim2 = np.shape(single_patch)[1]
-                single_patch = np.pad(single_patch, [(256-dim1, 0), (0,256-dim2)], mode='constant', constant_values=(0,0))
+                single_patch = np.pad(single_patch, [(patch_size-dim1, 0), (0,patch_size-dim2)], mode='constant', constant_values=(0,0))
             single_patch_norm = np.expand_dims(normalize(np.array(single_patch), axis=1),2)
+            # single_patch_norm = np.expand_dims((np.array(single_patch)),2)
             single_patch_shape = single_patch_norm.shape[:2]
             single_patch_input = np.expand_dims(single_patch_norm, 0)
             single_patch_prediction = (model.predict(single_patch_input)[0,:,:,0] > 0.5).astype(np.uint8)
-            if filled_patch == True:
+            if padded_patch == True:
                 # Crop the predicted image back to the original size
                 single_patch_prediction = single_patch_prediction[0:dim1, 0:dim2]
                 # reset the flag for the next patches
-                filled_patch = False
+                padded_patch = False
                 single_patch_shape = (dim1, dim2)
                 segm_img[i:i+dim1, j:j+dim2] += cv2.resize(single_patch_prediction, single_patch_shape[::-1])
             else:
