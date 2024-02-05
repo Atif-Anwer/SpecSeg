@@ -43,9 +43,14 @@ DOI            = {10.3390/s22176552}
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+---
+# Update (01/2024):
+There is now a Live Demo of the SpecSeg network on Huggingface. Please feel free to test at [Huggingface SpecSeg space](https://huggingface.co/spaces/atifanwerPK/SpecSeg). 
+(Note: Doesnt look correct on Safari browser due to Huggingface rendering, use Firefox/Chromimum based browsers please).
+
 
 <!-- GETTING STARTED -->
-## Introduction
+# Introduction
 
 This repository is the implementation of our paper 'SpecSeg Network for Specular Highlight Detection and Segmentation in Real-World Images'. The developed network and pretrained weights can be used for network training and testing. Please cite the paper if you use them and find them useful.
 
